@@ -5,7 +5,7 @@
       <button class="icon-button" type="button" aria-label="Page précédente" [disabled]="!canGoPrevious" (click)="previousPage()"><ion-icon name="chevron-back-outline"></ion-icon></button>
       <button class="page-button" type="button" (click)="openPageManager()">{{ totalPages ? pageNumber + ' / ' + totalPages : 'Aucune page' }}</button>
       <button class="icon-button" type="button" aria-label="Page suivante" [disabled]="!canGoNext" (click)="nextPage()"><ion-icon name="chevron-forward-outline"></ion-icon></button>
-      <button class="icon-button" type="button" aria-label="Membres" (click)="openCollabSheet()"><ion-icon name="people-outline"></ion-icon></button>
+      <button class="icon-button collaboration-button" type="button" aria-label="Partage et collaboration" (click)="openCollabSheet()"><ion-icon [name]="collaborationIconName"></ion-icon><span class="collaboration-badge" *ngIf="pendingInvitationCount">{{ pendingInvitationCount }}</span></button>
       <button class="icon-button" type="button" aria-label="Options du projet" (click)="showProjectOptions = !showProjectOptions"><ion-icon name="ellipsis-vertical-outline"></ion-icon></button>
     </header>
 
@@ -36,7 +36,10 @@
             [style.font-weight]="line.bold ? 700 : 400"
             [style.font-style]="line.italic ? 'italic' : 'normal'"
             [style.text-decoration]="(line.underline ? 'underline ' : '') + (line.strike ? 'line-through' : '')"
-            [style.color]="line.color"
+            [style.color]="line.labelStyle ? line.labelStyle.textColor : line.color"
+            [style.background]="line.labelStyle ? asLabelBackground(line.labelStyle) : ''"
+            [style.border-radius]="line.labelStyle ? '8px' : ''"
+            [style.padding]="line.labelStyle ? '4px 8px' : '3px 7px'"
             [style.text-align]="line.align"
             (pointerdown)="startLinePress(line, $event)"
             (pointerup)="cancelLinePress()"
@@ -93,6 +96,7 @@
       <button type="button" aria-label="Gras" [class.active]="selectedLine.bold" (click)="toggleSelectedLineStyle('bold')"><strong>B</strong><span>Gras</span></button>
       <button type="button" aria-label="Italique" [class.active]="selectedLine.italic" (click)="toggleSelectedLineStyle('italic')"><i>I</i><span>Italique</span></button>
       <button type="button" aria-label="Souligner" [class.active]="selectedLine.underline" (click)="toggleSelectedLineStyle('underline')"><u>U</u><span>Souligner</span></button>
+      <button type="button" aria-label="Labelliser" (click)="openLabelEditor()"><ion-icon name="pricetag-outline"></ion-icon><span>Label</span></button>
       <button type="button" aria-label="Aligner à gauche" [class.active]="selectedLine.align === 'left'" (click)="setSelectedLineAlign('left')"><ion-icon name="reorder-three-outline"></ion-icon><span>Gauche</span></button>
       <button type="button" aria-label="Centrer" [class.active]="selectedLine.align === 'center'" (click)="setSelectedLineAlign('center')"><ion-icon name="reorder-four-outline"></ion-icon><span>Centrer</span></button>
       <button type="button" aria-label="Aligner à droite" [class.active]="selectedLine.align === 'right'" (click)="setSelectedLineAlign('right')"><ion-icon name="reorder-four-outline"></ion-icon><span>Droite</span></button>
@@ -102,32 +106,52 @@
   <div class="project-message" *ngIf="projectMessage">{{ projectMessage }}</div>
   <ion-popover [isOpen]="showProjectOptions" (didDismiss)="showProjectOptions = false"><ng-template><ion-content class="compact-menu"><button type="button"><ion-icon name="information-circle-outline"></ion-icon> Informations du projet</button><button type="button"><ion-icon name="create-outline"></ion-icon> Renommer le projet</button><button type="button" (click)="handleProjectOption('pages')"><ion-icon name="documents-outline"></ion-icon> Toutes les pages</button><button type="button" (click)="createPageFromProjectMenu()"><ion-icon name="add-circle-outline"></ion-icon> Créer une page</button><button type="button" (click)="deletePageFromProjectMenu()"><ion-icon name="trash-outline"></ion-icon> Supprimer la page</button><button type="button"><ion-icon name="trash-outline"></ion-icon> Corbeille</button><button type="button" (click)="handleProjectOption('settings')"><ion-icon name="settings-outline"></ion-icon> Paramètres du projet</button><button type="button" (click)="handleProjectOption('sync')"><ion-icon name="cloud-upload-outline"></ion-icon> Synchroniser</button></ion-content></ng-template></ion-popover>
 
-  <ion-modal [isOpen]="showAllPages" (didDismiss)="showAllPages = false">
+  <ion-modal class="pages-manager-modal" [isOpen]="showAllPages" (didDismiss)="closePageManager()">
     <ng-template>
-      <ion-content class="pages-modal-content">
-        <div class="pages-modal-header"><strong>Toutes les pages</strong><div class="pages-header-actions"><button class="header-new-page" type="button" (click)="addPage()">+ Nouvelle page</button><button type="button" class="close-btn" (click)="showAllPages = false">×</button></div></div>
-        <div class="pages-grid">
-          <button
-            class="page-thumbnail"
-            *ngFor="let page of pages"
-            [class.current-page]="page.pageNumber === pageNumber"
-            type="button"
-            (click)="selectPage(page.pageNumber)"
-            (pointerdown)="startPagePress(page)"
-            (pointerup)="endPagePress()"
-            (pointerleave)="endPagePress()"
-          >
-            <span class="thumbnail-paper"><span *ngIf="page.lines.length">{{ page.lines[0].text | slice:0:28 }}</span><span class="thumbnail-empty" *ngIf="!page.lines.length">Page vide</span></span>
-            <span class="thumbnail-name">{{ page.name }}</span>
-            <small>{{ page.createdAt | date:'d MMM yyyy' }}</small>
-          </button>
-          <button class="new-page-card" type="button" (click)="addPage()"><span>+</span><small>Nouvelle page</small></button>
+      <ion-content class="pages-modal-content" [scrollY]="false">
+        <div class="pages-modal-layout">
+          <div class="pages-modal-header">
+            <strong>Toutes les pages</strong>
+            <button type="button" class="close-btn" aria-label="Fermer" (click)="closePageManager()">×</button>
+          </div>
+
+          <div class="pages-grid">
+            <button
+              class="page-thumbnail"
+              *ngFor="let page of pages"
+              [class.current-page]="page.pageNumber === pageNumber"
+              type="button"
+              (click)="selectPage(page.pageNumber)"
+              (pointerdown)="startPagePress(page)"
+              (pointerup)="endPagePress()"
+              (pointercancel)="endPagePress()"
+              (pointerleave)="endPagePress()"
+              (contextmenu)="openPageActions(page, $event)"
+            >
+              <span class="thumbnail-paper">
+                <span class="thumbnail-lines" *ngIf="page.lines.length; else emptyPagePreview">
+                  <span class="thumbnail-line" *ngFor="let previewLine of page.lines | slice:0:5">{{ previewLine.text | slice:0:34 }}</span>
+                </span>
+                <ng-template #emptyPagePreview><span class="thumbnail-empty">Page vide</span></ng-template>
+              </span>
+              <span class="thumbnail-name">{{ page.name }}</span>
+              <small>{{ formatPageDate(page.createdAt) }}</small>
+            </button>
+
+            <button class="new-page-card" type="button" (click)="addPage()">
+              <span class="new-page-plus">+</span>
+              <small>Nouvelle page</small>
+            </button>
+          </div>
+
+          <div class="pages-modal-footer">
+            <button type="button" (click)="closePageManager()">Fermer</button>
+          </div>
         </div>
       </ion-content>
     </ng-template>
   </ion-modal>
-
-  <ion-action-sheet [isOpen]="showPageActions" header="Options de la page" [buttons]="pageActionButtons" (didDismiss)="showPageActions = false"></ion-action-sheet>
+  <ion-action-sheet cssClass="page-actions-sheet" [isOpen]="showPageActions" [header]="selectedPage?.name || 'Options de la page'" [buttons]="pageActionButtons" (didDismiss)="closePageActions()"></ion-action-sheet>
   <ion-popover class="author-info-popover" [isOpen]="showAuthorPopover" [event]="authorPopoverEvent" side="right" alignment="center" (didDismiss)="closeAuthorPopover()">
     <ng-template>
       <div class="author-popover-card" *ngIf="selectedAuthor as author">
@@ -145,8 +169,71 @@
   </ion-popover>
   <ion-action-sheet [isOpen]="showLineDeleteActions" header="Supprimer le message" [buttons]="lineDeleteActionButtons" (didDismiss)="showLineDeleteActions = false"></ion-action-sheet>
   <ion-alert [isOpen]="showRenameAlert" header="Renommer la page" [inputs]="renameAlertInputs" [buttons]="renameAlertButtons" (didDismiss)="showRenameAlert = false"></ion-alert>
-  <ion-alert [isOpen]="showDeleteAlert" header="Supprimer cette page ?" message="Cette action ne pourra pas être annulée." [buttons]="deleteAlertButtons" (didDismiss)="showDeleteAlert = false"></ion-alert>
-  <ion-toast [isOpen]="showToast" [message]="toastMessage" duration="2200" position="bottom" (didDismiss)="showToast = false"></ion-toast>
+  <ion-alert cssClass="page-delete-alert" [isOpen]="showDeleteAlert" header="Supprimer cette page ?" message="Cette action supprimera son contenu. Elle ne pourra pas être annulée." [buttons]="deleteAlertButtons" (didDismiss)="showDeleteAlert = false"></ion-alert>
+  <ion-toast [isOpen]="showToast" [message]="toastMessage" [color]="toastColor" duration="2200" position="bottom" (didDismiss)="showToast = false"></ion-toast>
+
+  <ion-modal [isOpen]="showLabelEditor" (didDismiss)="closeLabelEditor()">
+    <ng-template>
+      <ion-content class="label-modal-content">
+        <div class="label-modal-header">
+          <strong>Label</strong>
+          <button type="button" class="close-btn" (click)="closeLabelEditor()">×</button>
+        </div>
+
+        <div class="label-preview-panel">
+          <div class="label-preview-chip"
+               [style.background]="asLabelBackground(labelEditorDraft)"
+               [style.color]="labelEditorDraft.textColor"
+               [style.opacity]="labelEditorDraft.opacity.toString()">
+            {{ selectedLabelText }}
+          </div>
+        </div>
+
+        <div class="label-section" *ngIf="labelRecentStyles.length">
+          <div class="label-section-title">Récents</div>
+          <div class="label-presets-grid recent-grid">
+            <button type="button" class="label-preset-btn" *ngFor="let style of labelRecentStyles" (click)="applyLabelStyle(style)">
+              <span class="preset-preview" [style.background]="asLabelBackground(style)" [style.color]="style.textColor">{{ selectedLabelText }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="label-section">
+          <div class="label-section-title">Styles</div>
+          <div class="label-presets-grid">
+            <button type="button" class="label-preset-btn" *ngFor="let style of labelPresets" [class.active]="labelEditorSelectedId === style.id" (click)="chooseLabelPreset(style)">
+              <span class="preset-preview" [style.background]="asLabelBackground(style)" [style.color]="style.textColor">{{ selectedLabelText }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="label-actions-row">
+          <button type="button" class="secondary-action" (click)="showCustomLabelControls = !showCustomLabelControls">Personnaliser</button>
+          <button *ngIf="selectedLine?.labelStyle" type="button" class="secondary-action danger" (click)="removeSelectedLabel()">Retirer le label</button>
+        </div>
+
+        <div class="custom-label-panel" *ngIf="showCustomLabelControls">
+          <label class="color-field">
+            <span>Couleur du fond</span>
+            <input type="color" [value]="labelEditorDraft.backgroundColor" (input)="onCustomLabelColor('backgroundColor', $any($event.target).value)">
+          </label>
+          <label class="color-field">
+            <span>Couleur du texte</span>
+            <input type="color" [value]="labelEditorDraft.textColor" (input)="onCustomLabelColor('textColor', $any($event.target).value)">
+          </label>
+          <label class="opacity-field">
+            <span>Opacité</span>
+            <input type="range" min="0.3" max="1" step="0.05" [value]="labelEditorDraft.opacity" (input)="onCustomLabelOpacity(+($any($event.target).value))">
+          </label>
+        </div>
+
+        <div class="label-modal-footer">
+          <button type="button" class="modal-cancel" (click)="closeLabelEditor()">Annuler</button>
+          <button type="button" class="modal-apply" (click)="applyCurrentLabelDraft()">Appliquer</button>
+        </div>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 
   <input #attachmentPicker class="hidden-attachment-picker" type="file" (change)="onAttachmentSelected($event)">
   <ion-action-sheet [isOpen]="showAttachmentActions" header="Ajouter au cahier" [buttons]="attachmentActionButtons" (didDismiss)="showAttachmentActions = false"></ion-action-sheet>
@@ -154,11 +241,13 @@
   <div class="collab-overlay" *ngIf="showCollabSheet" (click)="closeCollabSheet()">
     <div class="modal-sheet" (click)="$event.stopPropagation()">
       <div class="sheet-header"><strong>Partage et collaboration</strong><button class="close-btn" type="button" (click)="closeCollabSheet()">×</button></div>
+      <button class="pending-invitations-button" *ngIf="pendingInvitationCount" type="button" (click)="openInvitations()">{{ pendingInvitationCount }} invitation{{ pendingInvitationCount > 1 ? 's' : '' }} en attente</button>
       <p class="empty-collab" *ngIf="!collaborators.length">Aucun collaborateur pour le moment.</p>
       <div class="member-list" *ngIf="collaborators.length"><div class="member-row" *ngFor="let member of collaborators"><div class="avatar" [style.background]="member.color">{{ member.initials }}</div><span>{{ member.name }}</span><button class="permission-pill" type="button" (click)="onTogglePermission(member)">{{ member.canWrite ? 'Peut modifier' : 'Lecture seule' }}</button></div></div>
       <button class="contact-picker-button" type="button" (click)="chooseContact()">Choisir un contact</button>
       <div class="invite-form"><span>{{ countryCode }}</span><ion-input [value]="phoneValue" placeholder="1234 5678" (ionInput)="onPhoneInput($any($event).detail.value || '')"></ion-input></div>
       <ion-input class="contact-name-input" [value]="contactName" placeholder="Nom du contact" (ionInput)="contactName = $any($event).detail.value || ''"></ion-input>
+      <p class="invite-error" *ngIf="phoneError">{{ phoneError }}</p>
       <button class="primary-button" type="button" [disabled]="!isInviteValid" (click)="invitePerson()">Inviter</button>
     </div>
   </div>

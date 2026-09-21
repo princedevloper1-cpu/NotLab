@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonInput, IonSpinner } from '@ionic/angular';
 import { Router } from '@angular/router';
@@ -19,7 +19,7 @@ interface CountryOption {
   templateUrl: './onboarding.page.html',
   styleUrl: './onboarding.page.scss',
 })
-export class OnboardingPage {
+export class OnboardingPage implements OnInit {
   mode: 'welcome' | 'register' | 'login' | 'success' = 'welcome';
   name = '';
   phone = '';
@@ -50,6 +50,23 @@ export class OnboardingPage {
     private readonly router: Router,
   ) {}
 
+  ngOnInit() {
+    const storedName = localStorage.getItem('notlab.currentUserName')?.trim() || '';
+    const storedPhone = localStorage.getItem('notlab.currentUserPhone') || '';
+    const isRegistered = localStorage.getItem('notlab.isRegistered') === 'true';
+
+    if (isRegistered && storedName && storedPhone) {
+      this.name = storedName;
+      this.phone = storedPhone;
+      void this.router.navigateByUrl('/home', { replaceUrl: true });
+      return;
+    }
+
+    if (storedName) {
+      this.name = storedName;
+    }
+  }
+
   showRegister() {
     this.mode = 'register';
     this.resetMessage();
@@ -68,22 +85,29 @@ export class OnboardingPage {
   login() {
     const name = this.name.trim();
     const phone = this.normalizePhone(this.phone);
-    const savedName = localStorage.getItem('notlab.currentUserName')?.trim() || '';
-    const savedPhone = localStorage.getItem('notlab.currentUserPhone')?.replace(/\D/g, '') || '';
-    const fullPhone = `${this.selectedCountry.dialCode.replace(/\D/g, '')}${phone}`;
+    const fullPhone = `${this.selectedCountry.dialCode} ${this.formatLocalNumber(phone)}`;
 
     if (!name || phone.length !== this.selectedCountry.localLength) {
       this.errorMessage = 'Entrez votre nom et votre numéro de téléphone.';
       return;
     }
 
-    if (name.toLowerCase() !== savedName.toLowerCase() || fullPhone !== savedPhone) {
-      this.errorMessage = 'Ces informations ne correspondent pas à un compte enregistré sur cet appareil.';
-      return;
-    }
-
-    localStorage.setItem('notlab.isRegistered', 'true');
-    void this.router.navigateByUrl('/home');
+    this.isSubmitting = true;
+    this.errorMessage = '';
+    this.backend.verifyUser(name, fullPhone).subscribe({
+      next: (response) => {
+        localStorage.setItem('notlab.userId', response.user_id || localStorage.getItem('notlab.userId') || `user-${Date.now()}`);
+        localStorage.setItem('notlab.currentUserName', response.name || name);
+        localStorage.setItem('notlab.currentUserPhone', response.phone || fullPhone);
+        localStorage.setItem('notlab.isRegistered', 'true');
+        this.isSubmitting = false;
+        void this.router.navigateByUrl('/home', { replaceUrl: true });
+      },
+      error: (error: Error) => {
+        this.isSubmitting = false;
+        this.errorMessage = error.message || 'Ces informations ne correspondent pas à un compte enregistré.';
+      },
+    });
   }
 
   submitRegistration() {
@@ -156,5 +180,9 @@ export class OnboardingPage {
     if (digits.length === 10) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
     if (digits.length === 11) return `${digits.slice(0, 2)} ${digits.slice(2, 7)} ${digits.slice(7)}`;
     return digits;
+  }
+
+  private normalizePhoneForComparison(value: string): string {
+    return String(value || '').replace(/['\s+()\-]/g, '').replace(/\D/g, '');
   }
 }

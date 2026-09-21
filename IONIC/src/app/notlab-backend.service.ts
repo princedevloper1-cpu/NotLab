@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, map, timeout } from 'rxjs';
 
 export interface BackendElement {
   action: 'save_element';
@@ -18,6 +18,10 @@ export interface BackendResponse {
   status?: string;
   message?: string;
   element_id?: string;
+  user_id?: string;
+  invitee_user_id?: string;
+  name?: string;
+  phone?: string;
 }
 
 export interface BackendPage {
@@ -44,6 +48,34 @@ export interface ChatMessage {
 
 export interface ChatMessagesResponse extends BackendResponse {
   messages?: ChatMessage[];
+}
+
+export interface Invitation {
+  invitation_id: string;
+  project_id: string;
+  project_title: string;
+  inviter_user_id: string;
+  inviter_name: string;
+  created_at?: string;
+}
+
+export interface SharedProject {
+  project_id: string;
+  project_title: string;
+  inviter_name?: string;
+}
+
+export interface InvitationsResponse extends BackendResponse {
+  invitations?: Invitation[];
+}
+
+export interface SharedProjectsResponse extends BackendResponse {
+  projects?: SharedProject[];
+}
+
+export interface CollaboratorsResponse extends BackendResponse {
+  collaborators?: Array<{ user_id: string; name: string; role: string }>;
+  count?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -127,6 +159,32 @@ export class NotlabBackendService {
     return this.postAction({ action: 'delete_chat_message', message_id: messageId, user_id: userId });
   }
 
+  createInvitation(projectId: string, projectTitle: string, inviterUserId: string, inviteePhone: string): Observable<BackendResponse> {
+    return this.postAction({
+      action: 'create_invitation',
+      project_id: projectId,
+      project_title: projectTitle,
+      inviter_user_id: inviterUserId,
+      invitee_phone: inviteePhone,
+    });
+  }
+
+  listInvitations(userId: string): Observable<InvitationsResponse> {
+    return this.postAction({ action: 'list_invitations', user_id: userId }) as Observable<InvitationsResponse>;
+  }
+
+  respondInvitation(invitationId: string, userId: string, response: 'accepted' | 'declined'): Observable<BackendResponse> {
+    return this.postAction({ action: 'respond_invitation', invitation_id: invitationId, user_id: userId, response });
+  }
+
+  getSharedProjects(userId: string): Observable<SharedProjectsResponse> {
+    return this.postAction({ action: 'get_shared_projects', user_id: userId }) as Observable<SharedProjectsResponse>;
+  }
+
+  getProjectCollaborators(projectId: string): Observable<CollaboratorsResponse> {
+    return this.postAction({ action: 'get_project_collaborators', project_id: projectId }) as Observable<CollaboratorsResponse>;
+  }
+
   private postAction(payload: Record<string, unknown>): Observable<BackendResponse> {
     return this.http.post<BackendResponse>(this.webhookUrl, JSON.stringify(payload)).pipe(
       map((response) => {
@@ -145,9 +203,26 @@ export class NotlabBackendService {
       date: new Date().toISOString(),
       status: 'Actif',
     })).pipe(
+      timeout({ first: 8000 }),
       map((response) => {
         if (response.status === 'error') {
           throw new Error(response.message || 'Échec de l\'enregistrement.');
+        }
+        return response;
+      }),
+    );
+  }
+
+  verifyUser(name: string, phone: string): Observable<BackendResponse> {
+    return this.http.post<BackendResponse>(this.webhookUrl, JSON.stringify({
+      action: 'verify_user',
+      name,
+      phone,
+    })).pipe(
+      timeout({ first: 8000 }),
+      map((response) => {
+        if (response.status === 'error') {
+          throw new Error(response.message || 'Utilisateur introuvable.');
         }
         return response;
       }),

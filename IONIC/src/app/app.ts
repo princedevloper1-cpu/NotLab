@@ -25,6 +25,7 @@ import {
   informationCircleOutline,
   micOutline,
   peopleOutline,
+  personOutline,
   pricetagOutline,
   reorderFourOutline,
   reorderThreeOutline,
@@ -53,6 +54,7 @@ addIcons({
   informationCircleOutline,
   micOutline,
   peopleOutline,
+  personOutline,
   pricetagOutline,
   reorderFourOutline,
   reorderThreeOutline,
@@ -60,6 +62,14 @@ addIcons({
   settingsOutline,
   trashOutline,
 });
+
+interface LabelStyle {
+  id: string;
+  name: string;
+  backgroundColor: string;
+  textColor: string;
+  opacity: number;
+}
 
 interface NotebookLine {
   id: string;
@@ -76,6 +86,7 @@ interface NotebookLine {
   authorId?: string;
   authorName?: string;
   authorAvatarUrl?: string;
+  labelStyle?: LabelStyle;
 }
 
 interface Collaborator {
@@ -127,11 +138,16 @@ export class App {
   showTypography = false;
   showEmojiPicker = false;
   showCollabSheet = false;
+  pendingInvitationCount = 0;
+  collaboratorCount = 1;
+  isCheckingInvitations = false;
   showPageManager = false;
   showProjectOptions = false;
   showLineMenu = false;
   showLineMoreMenu = false;
   showLineDeleteActions = false;
+  showLabelEditor = false;
+  showCustomLabelControls = false;
   showAuthorPopover = false;
   authorPopoverEvent?: Event;
   selectedAuthor?: AuthorView;
@@ -145,6 +161,7 @@ export class App {
   showToast = false;
   selectedPage?: NotebookPage;
   toastMessage = '';
+  toastColor: 'primary' | 'success' | 'danger' = 'primary';
   projectMessage = '';
   countryCode = '+509';
   contactName = '';
@@ -170,15 +187,20 @@ export class App {
   collaborators: Collaborator[] = [];
   pageNumbers: number[] = [];
   private pagePressTimer?: number;
+  private pagePressConsumed = false;
   private linePressTimer?: number;
   private readonly authorPalette = ['#2563eb', '#059669', '#7c3aed', '#db2777', '#d97706', '#0891b2', '#4f46e5', '#be123c'];
-
-  pageActionButtons = [
-    { text: 'Renommer', handler: () => { this.showRenameAlert = true; } },
-    { text: 'Dupliquer', handler: () => this.duplicateSelectedPage() },
-    { text: 'Supprimer', role: 'destructive', handler: () => { if (this.pages.length > 1) this.showDeleteAlert = true; } },
-    { text: 'Annuler', role: 'cancel' },
+  readonly labelPresets: LabelStyle[] = [
+    { id: 'yellow', name: 'Jaune', backgroundColor: '#FDE68A', textColor: '#1F2937', opacity: 0.9 },
+    { id: 'blue', name: 'Bleu', backgroundColor: '#BFDBFE', textColor: '#0F172A', opacity: 0.9 },
+    { id: 'green', name: 'Vert', backgroundColor: '#BBF7D0', textColor: '#14532D', opacity: 0.9 },
+    { id: 'pink', name: 'Rose', backgroundColor: '#FBCFE8', textColor: '#4C0519', opacity: 0.9 },
+    { id: 'purple', name: 'Violet', backgroundColor: '#DDD6FE', textColor: '#2E1065', opacity: 0.9 },
+    { id: 'orange', name: 'Orange', backgroundColor: '#FED7AA', textColor: '#7C2D12', opacity: 0.9 },
   ];
+  labelRecentStyles: LabelStyle[] = [];
+  labelEditorDraft: LabelStyle = this.labelPresets[0];
+  labelEditorSelectedId = this.labelPresets[0].id;
 
   deleteAlertButtons = [
     { text: 'Annuler', role: 'cancel' },
@@ -205,12 +227,45 @@ export class App {
   get currentUserId(): string { return localStorage.getItem('notlab.userId') || 'web-user'; }
   get currentUserName(): string { return localStorage.getItem('notlab.currentUserName') || 'Utilisateur'; }
   get currentUserAvatarUrl(): string { return localStorage.getItem('notlab.currentUserAvatar') || ''; }
+  get currentProjectId(): string { return localStorage.getItem('notlab.activeProjectId') || `project:${this.currentUserId}`; }
+  get currentProjectTitle(): string { return localStorage.getItem('notlab.activeProjectTitle') || 'Projet Notlab'; }
+  get collaborationIconName(): string { return this.collaboratorCount > 1 ? 'people-outline' : 'person-outline'; }
   get currentPage(): NotebookPage | undefined { return this.pages.find((page) => page.pageNumber === this.pageNumber); }
   get isCurrentUserPageOwner(): boolean {
     return !!this.currentPage && (!this.currentPage.ownerUserId || this.currentPage.ownerUserId === this.currentUserId);
   }
+  get canManageSelectedPage(): boolean {
+    return !!this.selectedPage && (!this.selectedPage.ownerUserId || this.selectedPage.ownerUserId === this.currentUserId);
+  }
   get canManageSelectedLine(): boolean {
     return !!this.selectedLine && this.canManageLine(this.selectedLine);
+  }
+
+  get pageActionButtons() {
+    return [
+      {
+        text: 'Renommer',
+        icon: 'create-outline',
+        disabled: !this.canManageSelectedPage,
+        handler: () => this.beginRenameSelectedPage(),
+      },
+      {
+        text: 'Dupliquer',
+        icon: 'documents-outline',
+        handler: () => this.duplicateSelectedPage(),
+      },
+      {
+        text: 'Supprimer',
+        icon: 'trash-outline',
+        role: 'destructive',
+        disabled: !this.canManageSelectedPage || this.pages.length <= 1,
+        handler: () => this.beginDeleteSelectedPage(),
+      },
+      { text: 'Annuler', role: 'cancel' },
+    ];
+  }
+  get selectedLabelText(): string {
+    return (this.selectedLine?.text || this.draftText || 'Texte sélectionné').trim() || 'Texte sélectionné';
   }
 
   get lineDeleteActionButtons() {
@@ -258,6 +313,81 @@ export class App {
     this.showAuthorPopover = true;
   }
 
+  openLabelEditor() {
+    if (!this.selectedLine) return;
+    this.showLineMoreMenu = false;
+    this.showCustomLabelControls = false;
+    const currentStyle = this.selectedLine.labelStyle;
+    const selectedPreset = currentStyle ? this.labelPresets.find((preset) => preset.id === currentStyle.id) : this.labelPresets[0];
+    this.labelEditorSelectedId = selectedPreset ? selectedPreset.id : 'custom';
+    this.labelEditorDraft = currentStyle ? { ...currentStyle } : { ...this.labelPresets[0] };
+    this.showLabelEditor = true;
+  }
+
+  closeLabelEditor() {
+    this.showLabelEditor = false;
+    this.showCustomLabelControls = false;
+  }
+
+  applyLabelStyle(style: LabelStyle) {
+    if (!this.selectedLine) return;
+    const nextStyle: LabelStyle = { ...style, opacity: Number(style.opacity ?? 0.9) };
+    this.updateSelectedLine({ labelStyle: nextStyle });
+    this.labelRecentStyles = [nextStyle, ...this.labelRecentStyles.filter((item) => item.id !== nextStyle.id)].slice(0, 4);
+    this.showLabelEditor = false;
+    this.showCustomLabelControls = false;
+  }
+
+  removeSelectedLabel() {
+    if (!this.selectedLine) return;
+    this.updateSelectedLine({ labelStyle: undefined });
+    this.showLabelEditor = false;
+    this.showCustomLabelControls = false;
+  }
+
+  chooseLabelPreset(style: LabelStyle) {
+    this.labelEditorSelectedId = style.id;
+    this.labelEditorDraft = { ...style };
+    this.showCustomLabelControls = false;
+  }
+
+  onCustomLabelColor(property: 'backgroundColor' | 'textColor', value: string) {
+    if (!this.labelEditorDraft) return;
+    this.labelEditorDraft = { ...this.labelEditorDraft, [property]: value };
+    this.labelEditorSelectedId = 'custom';
+  }
+
+  onCustomLabelOpacity(value: number) {
+    if (!this.labelEditorDraft) return;
+    this.labelEditorDraft = { ...this.labelEditorDraft, opacity: Number(value) };
+  }
+
+  applyCurrentLabelDraft() {
+    const style: LabelStyle = {
+      id: this.labelEditorSelectedId === 'custom' ? `custom-${Date.now()}` : this.labelEditorSelectedId,
+      name: this.labelEditorSelectedId === 'custom' ? 'Personnalisé' : (this.labelPresets.find((preset) => preset.id === this.labelEditorSelectedId)?.name || 'Personnalisé'),
+      backgroundColor: this.labelEditorDraft.backgroundColor,
+      textColor: this.labelEditorDraft.textColor,
+      opacity: Number(this.labelEditorDraft.opacity ?? 0.9),
+    };
+    this.applyLabelStyle(style);
+  }
+
+  asLabelBackground(style?: LabelStyle): string {
+    if (!style) return '';
+    return this.hexToRgba(style.backgroundColor, style.opacity ?? 0.9);
+  }
+
+  private hexToRgba(hex: string, opacity: number): string {
+    const normalized = hex.replace('#', '');
+    const full = normalized.length === 3 ? normalized.split('').map((char) => char + char).join('') : normalized;
+    const numeric = Number.parseInt(full, 16);
+    const r = (numeric >> 16) & 255;
+    const g = (numeric >> 8) & 255;
+    const b = numeric & 255;
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+
   closeAuthorPopover() {
     this.showAuthorPopover = false;
     this.authorPopoverEvent = undefined;
@@ -283,6 +413,9 @@ export class App {
     this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe((event) => {
       this.isEditorRoute = (event as NavigationEnd).urlAfterRedirects === '/notebook';
     });
+    this.loadCollaborationState();
+    if (this.pages.length) this.syncPageState();
+    else this.ensurePageForWriting();
   }
 
   private syncPageState() {
@@ -293,31 +426,44 @@ export class App {
   goHome() { void this.router.navigateByUrl('/home'); }
 
   previousPage() {
-    this.pageNumber = Math.max(1, this.pageNumber - 1);
-    this.openPage(this.pageNumber);
+    this.openPage(Math.max(1, this.pageNumber - 1));
   }
 
   nextPage() {
-    this.pageNumber = Math.min(this.totalPages, this.pageNumber + 1);
-    this.openPage(this.pageNumber);
+    this.openPage(Math.min(this.totalPages, this.pageNumber + 1));
   }
 
-  openPageManager() { this.showAllPages = true; }
+  openPageManager() {
+    this.saveCurrentPage();
+    this.showPageActions = false;
+    this.selectedPage = undefined;
+    this.showAllPages = true;
+  }
+
+  closePageManager() {
+    this.showPageActions = false;
+    this.pagePressConsumed = false;
+    this.selectedPage = undefined;
+    this.showAllPages = false;
+  }
 
   selectPage(page: number) {
+    if (this.pagePressConsumed) {
+      this.pagePressConsumed = false;
+      return;
+    }
     this.openPage(page);
-    this.showAllPages = false;
-    this.selectedLine = undefined;
+    this.closePageManager();
   }
 
-  openPage(pageNumber: number) {
+  openPage(pageNumber: number, saveCurrent = true) {
     const page = this.pages.find((item) => item.pageNumber === pageNumber);
     if (!page) return;
-    this.saveCurrentPage();
+    if (saveCurrent) this.saveCurrentPage();
     this.pageNumber = page.pageNumber;
     this.lines = page.lines;
+    this.closeLineMenus();
   }
-
   addPage() {
     this.saveCurrentPage();
     const pageNumber = this.pages.length + 1;
@@ -325,7 +471,7 @@ export class App {
       pageId: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       pageNumber,
       name: `Page ${pageNumber}`,
-      createdAt: new Date().toISOString(),
+      createdAt: this.toLocalCreatedAt(),
       lines: [],
       ownerUserId: this.currentUserId,
     };
@@ -333,15 +479,19 @@ export class App {
     this.syncPageState();
     this.persistPages();
     this.syncPagesToBackend();
-    this.openPage(pageNumber);
-    this.showAllPages = false;
-    this.showSuccess(`Page ${pageNumber} créée.`);
+    this.openPage(pageNumber, false);
+    this.closePageManager();
+    this.showSuccess('Nouvelle page créée.');
+    setTimeout(() => void this.composerInput?.setFocus(), 0);
   }
-
   startPagePress(page: NotebookPage) {
+    this.endPagePress();
+    this.pagePressConsumed = false;
     this.selectedPage = page;
     this.renameAlertInputs[0].value = page.name;
     this.pagePressTimer = window.setTimeout(() => {
+      this.pagePressTimer = undefined;
+      this.pagePressConsumed = true;
       this.selectedPage = page;
       this.showPageActions = true;
     }, 550);
@@ -349,43 +499,90 @@ export class App {
 
   endPagePress() {
     if (this.pagePressTimer) window.clearTimeout(this.pagePressTimer);
+    this.pagePressTimer = undefined;
   }
 
+  openPageActions(page: NotebookPage, event?: Event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.endPagePress();
+    this.pagePressConsumed = true;
+    this.selectedPage = page;
+    this.renameAlertInputs[0].value = page.name;
+    this.showPageActions = true;
+  }
+
+  closePageActions() {
+    this.showPageActions = false;
+    this.pagePressConsumed = false;
+  }
+
+  beginRenameSelectedPage() {
+    if (!this.canManageSelectedPage) {
+      this.closePageActions();
+      this.showSuccess('Seul le propriétaire peut renommer cette page.', 'danger');
+      return;
+    }
+    this.showPageActions = false;
+    this.renameAlertInputs[0].value = this.selectedPage?.name || '';
+    this.showRenameAlert = true;
+  }
+
+  beginDeleteSelectedPage() {
+    if (this.pages.length <= 1) {
+      this.closePageActions();
+      this.showSuccess('La dernière page ne peut pas être supprimée.', 'danger');
+      return;
+    }
+    if (!this.canManageSelectedPage) {
+      this.closePageActions();
+      this.showSuccess('Seul le propriétaire peut supprimer cette page.', 'danger');
+      return;
+    }
+    this.showPageActions = false;
+    this.showDeleteAlert = true;
+  }
   renameSelectedPage(name: string) {
     if (!this.selectedPage || !name.trim()) return;
-    if (this.selectedPage.ownerUserId && this.selectedPage.ownerUserId !== this.currentUserId) {
+    if (!this.canManageSelectedPage) {
       this.showRenameAlert = false;
-      this.showSuccess('Seul le propriétaire peut renommer cette page.');
+      this.showSuccess('Seul le propriétaire peut renommer cette page.', 'danger');
       return;
     }
     this.selectedPage.name = name.trim();
     this.persistPages();
     this.syncPagesToBackend();
     this.showRenameAlert = false;
+    this.showPageActions = false;
     this.showSuccess('Page renommée.');
   }
-
   deleteSelectedPage() {
     if (!this.selectedPage || this.pages.length <= 1) return;
-    if (this.selectedPage.ownerUserId && this.selectedPage.ownerUserId !== this.currentUserId) {
+    if (!this.canManageSelectedPage) {
       this.showDeleteAlert = false;
-      this.showSuccess('Seul le propriétaire peut supprimer cette page.');
+      this.showSuccess('Seul le propriétaire peut supprimer cette page.', 'danger');
       return;
     }
-    const removedNumber = this.selectedPage.pageNumber;
-    this.pages = this.pages.filter((page) => page.pageId !== this.selectedPage?.pageId)
+
+    this.saveCurrentPage();
+    const removedPage = this.selectedPage;
+    const removedNumber = removedPage.pageNumber;
+    this.pages = this.pages
+      .filter((page) => page.pageId !== removedPage.pageId)
       .map((page, index) => ({ ...page, pageNumber: index + 1 }));
     this.syncPageState();
-    const nextPage = Math.min(removedNumber, this.totalPages);
+
+    const nextPageNumber = Math.min(removedNumber, this.totalPages);
     this.persistPages();
-    this.backend.deletePage(this.selectedPage.pageId, this.currentUserId).subscribe({ error: () => undefined });
+    this.backend.deletePage(removedPage.pageId, this.currentUserId).subscribe({ error: () => undefined });
     this.syncPagesToBackend();
     this.selectedPage = undefined;
     this.showDeleteAlert = false;
-    this.openPage(nextPage);
-    this.showSuccess('Page supprimée.');
+    this.showPageActions = false;
+    this.showAllPages = false;
+    this.openPage(nextPageNumber, false);
+    this.showSuccess('Page supprimée.', 'success');
   }
-
   createPageFromProjectMenu() {
     this.showProjectOptions = false;
     this.addPage();
@@ -393,25 +590,22 @@ export class App {
 
   deletePageFromProjectMenu() {
     this.showProjectOptions = false;
-    if (this.totalPages <= 1) {
-      this.showSuccess('La dernière page ne peut pas être supprimée.');
-      return;
-    }
     this.selectedPage = this.pages.find((page) => page.pageNumber === this.pageNumber);
-    this.showDeleteAlert = true;
+    this.beginDeleteSelectedPage();
   }
 
   duplicateSelectedPage() {
     if (!this.selectedPage) return;
     this.saveCurrentPage();
+    const sourcePage = this.selectedPage;
     const copy: NotebookPage = {
-      ...this.selectedPage,
+      ...sourcePage,
       pageId: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-      pageNumber: this.selectedPage.pageNumber + 1,
-      name: `${this.selectedPage.name} (copie)`,
-      createdAt: new Date().toISOString(),
+      pageNumber: sourcePage.pageNumber + 1,
+      name: `${sourcePage.name} (copie)`,
+      createdAt: this.toLocalCreatedAt(),
       ownerUserId: this.currentUserId,
-      lines: this.selectedPage.lines.map((line) => ({
+      lines: sourcePage.lines.map((line) => ({
         ...line,
         id: `${Date.now()}-${Math.random()}`,
         userId: this.currentUserId,
@@ -425,13 +619,15 @@ export class App {
     this.syncPageState();
     this.persistPages();
     this.syncPagesToBackend();
-    this.openPage(copy.pageNumber);
+    this.openPage(copy.pageNumber, false);
     this.showPageActions = false;
+    this.showAllPages = false;
+    this.selectedPage = undefined;
     this.showSuccess('Page dupliquée.');
   }
-
-  showSuccess(message: string) {
+  showSuccess(message: string, color: 'primary' | 'success' | 'danger' = 'primary') {
     this.toastMessage = message;
+    this.toastColor = color;
     this.showToast = true;
   }
 
@@ -528,7 +724,7 @@ export class App {
       pageId: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       pageNumber: 1,
       name: 'Page 1',
-      createdAt: new Date().toISOString(),
+      createdAt: this.toLocalCreatedAt(),
       lines: [],
       ownerUserId: this.currentUserId,
     };
@@ -707,8 +903,42 @@ export class App {
     }
   }
 
-  openCollabSheet() { this.showCollabSheet = true; }
+  openCollabSheet() {
+    if (this.isCheckingInvitations) return;
+    this.isCheckingInvitations = true;
+    this.loadInvitationsForIcon();
+  }
+
+  private loadInvitationsForIcon() {
+    if (!this.currentUserId || this.currentUserId === 'web-user') {
+      this.isCheckingInvitations = false;
+      this.showCollabSheet = true;
+      return;
+    }
+    this.backend.listInvitations(this.currentUserId).subscribe({
+      next: (response) => {
+        this.pendingInvitationCount = response.invitations?.length || 0;
+        this.isCheckingInvitations = false;
+        if (this.pendingInvitationCount > 0) {
+          void this.router.navigateByUrl('/invitations');
+          return;
+        }
+        this.showCollabSheet = true;
+        this.loadCollaborationState();
+      },
+      error: () => {
+        this.isCheckingInvitations = false;
+        this.showCollabSheet = true;
+        this.loadCollaborationState();
+      },
+    });
+  }
   closeCollabSheet() { this.showCollabSheet = false; }
+
+  openInvitations() {
+    this.showCollabSheet = false;
+    void this.router.navigateByUrl('/invitations');
+  }
 
   invitePerson() {
     if (!this.isInviteValid) {
@@ -717,20 +947,55 @@ export class App {
     }
     const normalizedPhone = this.phoneValue.replace(/\s+/g, '');
     const memberName = this.contactName.trim() || normalizedPhone;
-    const memberId = 'phone:' + this.countryCode + normalizedPhone;
-    this.collaborators = [...this.collaborators, {
-      id: memberId,
-      name: memberName,
-      online: false,
-      presenceKnown: false,
-      canWrite: true,
-      color: this.stableAuthorColor(memberId),
-      initials: this.initialsFor(memberName),
-    }];
-    this.phoneValue = '';
-    this.contactName = '';
-    this.phoneError = '';
-    this.showCollabSheet = false;
+    this.backend.createInvitation(this.currentProjectId, this.currentProjectTitle, this.currentUserId, `${this.countryCode}${normalizedPhone}`).subscribe({
+      next: (response) => {
+        const memberId = response.invitee_user_id || `phone:${this.countryCode}${normalizedPhone}`;
+        this.collaborators = [...this.collaborators, {
+          id: memberId,
+          name: memberName,
+          online: false,
+          presenceKnown: false,
+          canWrite: true,
+          color: this.stableAuthorColor(memberId),
+          initials: this.initialsFor(memberName),
+        }];
+        this.collaboratorCount = Math.max(2, this.collaboratorCount);
+        this.phoneValue = '';
+        this.contactName = '';
+        this.phoneError = '';
+        this.showCollabSheet = false;
+        this.showSuccess('Invitation envoyée.');
+      },
+      error: (error: Error) => {
+        this.phoneError = error.message || 'Invitation impossible.';
+      },
+    });
+  }
+
+  private loadCollaborationState(redirectToInvitations = false) {
+    if (!this.currentUserId || this.currentUserId === 'web-user') return;
+    this.backend.listInvitations(this.currentUserId).subscribe({
+      next: (response) => {
+        this.pendingInvitationCount = response.invitations?.length || 0;
+        if (redirectToInvitations && this.pendingInvitationCount > 0) this.openInvitations();
+      },
+      error: () => undefined,
+    });
+    this.backend.getProjectCollaborators(this.currentProjectId).subscribe({
+      next: (response) => {
+        this.collaboratorCount = Math.max(1, response.count || 1);
+        this.collaborators = (response.collaborators || []).map((member) => ({
+          id: member.user_id,
+          name: member.name,
+          online: false,
+          presenceKnown: false,
+          canWrite: true,
+          color: this.stableAuthorColor(member.user_id),
+          initials: this.initialsFor(member.name),
+        }));
+      },
+      error: () => undefined,
+    });
   }
 
   openAttachmentPicker(type: 'image' | 'photo' | 'file') {
@@ -787,7 +1052,7 @@ export class App {
 
   handleProjectOption(option: 'pages' | 'settings' | 'sync') {
     if (option === 'pages') {
-      this.showAllPages = true;
+      this.openPageManager();
     } else if (option === 'sync') {
       this.saveCurrentPage();
       this.syncPagesToBackend();
@@ -816,6 +1081,19 @@ export class App {
     setTimeout(() => this.projectMessage = '', 2200);
   }
 
+  formatPageDate(value: string): string {
+    if (!value) return '';
+    const localDate = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+    const date = localDate
+      ? new Date(Number(localDate[3]), Number(localDate[2]) - 1, Number(localDate[1]))
+      : new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+  }
   private storageKey() { return `notlab.editor.page.${this.pageNumber}`; }
 
   private saveCurrentPage() {
@@ -839,8 +1117,9 @@ export class App {
           localStorage.removeItem('notlab.editor.seeded');
           return [];
         }
-        const migrated = saved.map((page) => ({
+        const migrated = saved.map((page, index) => ({
           ...page,
+          pageNumber: index + 1,
           ownerUserId: page.ownerUserId || this.currentUserId,
           lines: (page.lines || []).map((line) => {
             const authorId = line.authorId || line.userId || page.ownerUserId || this.currentUserId;
@@ -879,5 +1158,13 @@ export class App {
       owner_user_id: page.ownerUserId || this.currentUserId,
     }));
     this.backend.syncPages(payload, this.currentUserId).subscribe({ error: () => undefined });
+  }
+
+  private toLocalCreatedAt(date: Date = new Date()): string {
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
   }
 }

@@ -3,10 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Router } from '@angular/router';
-import { NotlabBackendService } from './notlab-backend.service';
+import { NotlabBackendService, SharedProject } from './notlab-backend.service';
 
 interface NotebookItem {
   id: string;
+  projectId: string;
   title: string;
   date: string;
   dateModified: number;
@@ -39,7 +40,9 @@ export class HomePage {
   constructor(
     private readonly router: Router,
     private readonly backend: NotlabBackendService,
-  ) {}
+  ) {
+    this.loadSharedProjects();
+  }
 
 
   toggleAccountMenu() {
@@ -142,6 +145,7 @@ export class HomePage {
     const now = Date.now();
     const notebook: NotebookItem = {
       id: `nb_${now}`,
+      projectId: `project:${this.userName}:${now}`,
       title: 'Nouvelle note',
       date: 'Aujourd’hui',
       dateModified: now,
@@ -153,7 +157,44 @@ export class HomePage {
     };
     this.notebooks = [notebook, ...this.notebooks];
     this.saveNotebooks();
+    localStorage.setItem('notlab.activeProjectId', notebook.projectId);
+    localStorage.setItem('notlab.activeProjectTitle', notebook.title);
     void this.router.navigateByUrl('/notebook');
+  }
+
+  selectNotebook(notebook: NotebookItem, event: Event) {
+    event.stopPropagation();
+    localStorage.setItem('notlab.activeProjectId', notebook.projectId || notebook.id);
+    localStorage.setItem('notlab.activeProjectTitle', notebook.title);
+  }
+
+  private loadSharedProjects() {
+    const userId = localStorage.getItem('notlab.userId') || '';
+    if (!userId) return;
+    this.backend.getSharedProjects(userId).subscribe({
+      next: (response) => {
+        const shared = (response.projects || []).map((project) => this.toSharedNotebook(project));
+        const localIds = new Set(this.notebooks.map((notebook) => notebook.projectId || notebook.id));
+        this.notebooks = [...this.notebooks, ...shared.filter((notebook) => !localIds.has(notebook.projectId))];
+        this.saveNotebooks();
+      },
+      error: () => undefined,
+    });
+  }
+
+  private toSharedNotebook(project: SharedProject): NotebookItem {
+    return {
+      id: `shared:${project.project_id}`,
+      projectId: project.project_id,
+      title: project.project_title,
+      date: 'Partagé récemment',
+      dateModified: Date.now(),
+      people: project.inviter_name ? `Avec ${project.inviter_name}` : 'Projet partagé',
+      memberCount: 2,
+      pages: 1,
+      isShared: true,
+      isFavorite: false,
+    };
   }
 
   private loadNotebooks(): NotebookItem[] {
@@ -162,7 +203,10 @@ export class HomePage {
       try {
         const notebooks = JSON.parse(saved) as NotebookItem[];
         const defaultIds = new Set(['nb_1', 'nb_2', 'nb_3', 'nb_4', 'nb_5', 'nb_6']);
-        const userNotebooks = notebooks.filter((notebook) => !defaultIds.has(notebook.id));
+        const userNotebooks = notebooks.filter((notebook) => !defaultIds.has(notebook.id)).map((notebook) => ({
+          ...notebook,
+          projectId: notebook.projectId || notebook.id,
+        }));
         localStorage.setItem('notlab.notebooks', JSON.stringify(userNotebooks));
         return userNotebooks;
       } catch {

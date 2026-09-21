@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NotLab</string>
+    <string name="title_activity_main">NotLab</string>
+    <string name="package_name">com.notlab.app</string>
+    <string name="custom_url_scheme">com.notlab.app</string>
+</resources>

@@ -1,0 +1,92 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  color: #f8fafc;
+  font-family: 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+.invitations-shell {
+  min-height: 100vh;
+  padding: 22px max(20px, calc((100vw - 760px) / 2));
+  background: #0c111b;
+}
+
+.invitations-header {
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.invitations-header button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: white;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.invitations-header h1 {
+  margin: 0;
+  font-size: 22px;
+  text-align: center;
+}
+
+.invitation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.invitation-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 14px;
+  background: #171d29;
+}
+
+.invitation-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-weight: 800;
+}
+
+.invitation-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.invitation-copy strong { font-size: 15px; }
+.invitation-copy span { color: #bfdbfe; font-size: 14px; }
+.invitation-copy small { color: rgba(226, 232, 240, .6); font-size: 12px; }
+
+.invitation-actions {
+  grid-column: 2;
+  display: flex;
+  gap: 8px;
+}
+
+.invitation-actions button {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.invitation-actions button:disabled { opacity: .5; cursor: default; }
+.invitation-actions .decline { border: 1px solid rgba(248, 113, 113, .35); background: transparent; color: #fecaca; }
+.invitation-actions .accept { border: 0; background: #2563eb; color: white; }
+.empty-state, .page-message { color: rgba(226, 232, 240, .62); text-align: center; }
+.page-message { color: #fca5a5; }

@@ -1,0 +1,287 @@
+// ============================================================
+// Notlab Design System
+// Centralized UI tokens for Android + iOS Angular/Ionic app
+// ============================================================
+
+// ---------------------------
+// Fonts
+// ---------------------------
+$font-ui-primary: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+$font-ui-secondary: "Inter", "Segoe UI", sans-serif;
+
+// Notebook content typography is intentionally separate from application UI.
+$font-notebook-handwriting-1: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+$font-notebook-handwriting-2: "Marker Felt", "Segoe Print", cursive;
+$font-notebook-handwriting-3: "Snell Roundhand", "Segoe Script", cursive;
+$font-notebook-inter: "Inter", "Segoe UI", sans-serif;
+$font-notebook-roboto: "Roboto", "Segoe UI", sans-serif;
+$font-notebook-poppins: "Poppins", "Segoe UI", sans-serif;
+
+// ---------------------------
+// Color palette
+// ---------------------------
+$notlab-bg: #0f131c;
+$notlab-bg-strong: #0b0f17;
+$notlab-surface: #131722;
+$notlab-surface-strong: #1a202c;
+$notlab-surface-soft: #1d2433;
+$notlab-surface-muted: #202a39;
+$notlab-paper: #f4efe8;
+$notlab-paper-strong: #efe6db;
+$notlab-text: #f5f7fa;
+$notlab-text-strong: #ffffff;
+$notlab-text-soft: #dfeaf6;
+$notlab-muted: #94a3b8;
+$notlab-muted-strong: #b7c0cc;
+$notlab-border: rgba(148, 163, 184, 0.14);
+$notlab-border-strong: rgba(148, 163, 184, 0.22);
+$notlab-blue: #2563eb;
+$notlab-blue-strong: #1d4ed8;
+$notlab-blue-soft: #60a5fa;
+$notlab-blue-pale: rgba(37, 99, 235, 0.12);
+$notlab-success: #10b981;
+$notlab-warning: #f59e0b;
+$notlab-danger: #ef4444;
+$notlab-purple: #8b5cf6;
+$notlab-pink: #ec4899;
+$notlab-teal: #14b8a6;
+
+// ---------------------------
+// Semantic colors
+// ---------------------------
+$notlab-color-background: $notlab-bg;
+$notlab-color-surface: $notlab-surface;
+$notlab-color-surface-elevated: $notlab-surface-strong;
+$notlab-color-surface-card: $notlab-surface-strong;
+$notlab-color-paper: $notlab-paper;
+$notlab-color-primary: $notlab-blue;
+$notlab-color-primary-strong: $notlab-blue-strong;
+$notlab-color-primary-soft: $notlab-blue-soft;
+$notlab-color-text: $notlab-text;
+$notlab-color-text-secondary: $notlab-muted;
+$notlab-color-text-muted: $notlab-muted-strong;
+$notlab-color-border: $notlab-border;
+$notlab-color-shadow: rgba(8, 10, 14, 0.34);
+
+// ---------------------------
+// Typography tokens
+// ---------------------------
+$notlab-display-size: 28px;
+$notlab-display-weight: 700;
+$notlab-display-line-height: 1.2;
+
+$notlab-page-title-size: 22px;
+$notlab-page-title-weight: 700;
+$notlab-page-title-line-height: 1.3;
+
+$notlab-section-title-size: 18px;
+$notlab-section-title-weight: 600;
+$notlab-section-title-line-height: 1.4;
+
+$notlab-body-size: 16px;
+$notlab-body-weight: 400;
+$notlab-body-line-height: 1.5;
+
+$notlab-secondary-size: 14px;
+$notlab-secondary-weight: 400;
+$notlab-secondary-line-height: 1.5;
+
+$notlab-caption-size: 12px;
+$notlab-caption-weight: 500;
+$notlab-caption-line-height: 1.4;
+
+$notlab-button-size: 15px;
+$notlab-button-weight: 600;
+$notlab-button-line-height: 1.3;
+
+// Typography mixins
+@mixin notlab-display {
+  font-family: $font-ui-primary;
+  font-size: $notlab-display-size;
+  font-weight: $notlab-display-weight;
+  line-height: $notlab-display-line-height;
+  letter-spacing: -0.02em;
+}
+
+@mixin notlab-page-title {
+  font-family: $font-ui-primary;
+  font-size: $notlab-page-title-size;
+  font-weight: $notlab-page-title-weight;
+  line-height: $notlab-page-title-line-height;
+  letter-spacing: -0.01em;
+}
+
+@mixin notlab-section-title {
+  font-family: $font-ui-primary;
+  font-size: $notlab-section-title-size;
+  font-weight: $notlab-section-title-weight;
+  line-height: $notlab-section-title-line-height;
+}
+
+@mixin notlab-body {
+  font-family: $font-ui-primary;
+  font-size: $notlab-body-size;
+  font-weight: $notlab-body-weight;
+  line-height: $notlab-body-line-height;
+}
+
+@mixin notlab-secondary {
+  font-family: $font-ui-primary;
+  font-size: $notlab-secondary-size;
+  font-weight: $notlab-secondary-weight;
+  line-height: $notlab-secondary-line-height;
+}
+
+@mixin notlab-caption {
+  font-family: $font-ui-primary;
+  font-size: $notlab-caption-size;
+  font-weight: $notlab-caption-weight;
+  line-height: $notlab-caption-line-height;
+  letter-spacing: 0.01em;
+}
+
+@mixin notlab-button {
+  font-family: $font-ui-primary;
+  font-size: $notlab-button-size;
+  font-weight: $notlab-button-weight;
+  line-height: $notlab-button-line-height;
+}
+
+// ---------------------------
+// Spacing scale
+// ---------------------------
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 20px;
+$space-6: 24px;
+$space-8: 32px;
+$space-10: 40px;
+$space-12: 48px;
+$space-14: 56px;
+$space-16: 64px;
+
+// ---------------------------
+// Border radius
+// ---------------------------
+$radius-xs: 8px;
+$radius-sm: 10px;
+$radius-md: 12px;
+$radius-lg: 16px;
+$radius-xl: 18px;
+$radius-pill: 999px;
+
+// ---------------------------
+// Shadows
+// ---------------------------
+$shadow-sm: 0 4px 12px rgba(8, 10, 14, 0.12);
+$shadow-md: 0 8px 20px rgba(8, 10, 14, 0.18);
+$shadow-lg: 0 12px 28px rgba(8, 10, 14, 0.22);
+$shadow-soft: 0 2px 8px rgba(17, 24, 39, 0.1);
+
+// ---------------------------
+// Border / line system
+// ---------------------------
+$border-subtle: 1px solid $notlab-border;
+$border-strong: 1px solid $notlab-border-strong;
+
+// ---------------------------
+// Screen / container sizes
+// ---------------------------
+$notlab-shell-max-width: 430px;
+$notlab-shell-min-height: 100vh;
+
+// ---------------------------
+// Notebook content typography system
+// ---------------------------
+$notlab-notebook-title-size: 22px;
+$notlab-notebook-body-size: 18px;
+$notlab-notebook-caption-size: 13px;
+
+@mixin notlab-notebook-body($font: $font-notebook-handwriting-1) {
+  font-family: $font;
+  font-size: $notlab-notebook-body-size;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+@mixin notlab-notebook-title($font: $font-notebook-handwriting-1) {
+  font-family: $font;
+  font-size: $notlab-notebook-title-size;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+// ---------------------------
+// Common UI tokens for Ionic components
+// ---------------------------
+$ion-background: $notlab-bg;
+$ion-background-contrast: $notlab-surface;
+$ion-text-color: $notlab-text;
+$ion-text-color-secondary: $notlab-muted;
+$ion-border-color: $notlab-border;
+$ion-primary: $notlab-blue;
+$ion-primary-contrast: $notlab-text-strong;
+$ion-card-background: $notlab-surface-strong;
+$ion-item-background: transparent;
+$ion-toolbar-background: $notlab-surface;
+$ion-modal-background: rgba(11, 15, 23, 0.82);
+
+// ---------------------------
+// App shell variables
+// ---------------------------
+:root {
+  --notlab-bg: #{$notlab-bg};
+  --notlab-bg-strong: #{$notlab-bg-strong};
+  --notlab-surface: #{$notlab-surface};
+  --notlab-surface-strong: #{$notlab-surface-strong};
+  --notlab-surface-soft: #{$notlab-surface-soft};
+  --notlab-paper: #{$notlab-paper};
+  --notlab-text: #{$notlab-text};
+  --notlab-text-secondary: #{$notlab-muted};
+  --notlab-border: #{$notlab-border};
+  --notlab-blue: #{$notlab-blue};
+  --notlab-blue-soft: #{$notlab-blue-soft};
+  --notlab-success: #{$notlab-success};
+  --notlab-warning: #{$notlab-warning};
+  --notlab-danger: #{$notlab-danger};
+
+  --notlab-display-size: #{$notlab-display-size};
+  --notlab-display-weight: #{$notlab-display-weight};
+  --notlab-page-title-size: #{$notlab-page-title-size};
+  --notlab-section-title-size: #{$notlab-section-title-size};
+  --notlab-body-size: #{$notlab-body-size};
+  --notlab-secondary-size: #{$notlab-secondary-size};
+  --notlab-caption-size: #{$notlab-caption-size};
+  --notlab-button-size: #{$notlab-button-size};
+
+  --notlab-radius-xs: #{$radius-xs};
+  --notlab-radius-sm: #{$radius-sm};
+  --notlab-radius-md: #{$radius-md};
+  --notlab-radius-lg: #{$radius-lg};
+  --notlab-radius-xl: #{$radius-xl};
+  --notlab-radius-pill: #{$radius-pill};
+
+  --notlab-shadow-sm: #{$shadow-sm};
+  --notlab-shadow-md: #{$shadow-md};
+  --notlab-shadow-lg: #{$shadow-lg};
+  --notlab-shadow-soft: #{$shadow-soft};
+
+  --notlab-font-ui: #{$font-ui-primary};
+  --notlab-font-notebook-handwriting-1: #{$font-notebook-handwriting-1};
+  --notlab-font-notebook-handwriting-2: #{$font-notebook-handwriting-2};
+  --notlab-font-notebook-handwriting-3: #{$font-notebook-handwriting-3};
+  --notlab-font-notebook-inter: #{$font-notebook-inter};
+  --notlab-font-notebook-roboto: #{$font-notebook-roboto};
+  --notlab-font-notebook-poppins: #{$font-notebook-poppins};
+}
+
+// ---------------------------
+// Guidance for design usage
+// ---------------------------
+// 1. Use only Inter for application interface UI, menus, dialogs, settings, buttons and sheets.
+// 2. Keep notebook content using its own font family system.
+// 3. Use blue as primary accent to align with Notlab dark minimal visual identity.
+// 4. Keep borders subtle and shadows soft so Android + iOS share a unified visual rhythm.
+// 5. Update only this file when making global Notlab brand changes.

@@ -38,3 +38,244 @@ body {
 body {
 	overflow-x: hidden;
 }
+/* NOTLAB PAGES MANAGER GLOBAL OVERLAY */
+/* Ionic renders overlays outside Angular component style scope. */
+ion-modal.pages-manager-modal {
+  --width: 100%;
+  --height: 100%;
+  --border-radius: 0;
+  --background: #0b1522;
+  --box-shadow: none;
+  --backdrop-opacity: 1;
+}
+
+ion-modal.pages-manager-modal::part(content) {
+  background: #0b1522;
+}
+
+.pages-manager-modal .pages-modal-content {
+  --background: #0b1522;
+  height: 100%;
+  color: #fff;
+}
+
+.pages-manager-modal .pages-modal-layout {
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at top, #16293c 0, #0b1522 48%, #08111b 100%);
+}
+
+.pages-manager-modal .pages-modal-header {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  padding: calc(14px + env(safe-area-inset-top)) 14px 10px;
+  color: #fff;
+  font-size: 18px;
+  text-align: center;
+}
+
+.pages-manager-modal .pages-modal-header strong {
+  grid-column: 2;
+}
+
+.pages-manager-modal .close-btn {
+  grid-column: 3;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  padding: 0;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.pages-manager-modal .pages-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 13px 10px;
+  overflow-y: auto;
+  padding: 12px 14px 18px;
+  touch-action: pan-y;
+}
+
+.pages-manager-modal .page-thumbnail,
+.pages-manager-modal .new-page-card {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 9px;
+  background: transparent;
+  color: #fff;
+  padding: 4px;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pages-manager-modal .page-thumbnail.current-page {
+  border: 3px solid #1677f2;
+  background: rgba(37, 99, 235, .12);
+  box-shadow: 0 0 0 2px rgba(22, 119, 242, .16);
+}
+
+.pages-manager-modal .thumbnail-paper {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 4px;
+  padding: 12px 6px 8px 20px;
+  background:
+    linear-gradient(90deg, transparent 15px, rgba(225, 92, 106, .58) 15px, rgba(225, 92, 106, .58) 16px, transparent 16px),
+    repeating-linear-gradient(to bottom, #f8f3ea 0, #f8f3ea 18px, rgba(80, 137, 190, .25) 18px, rgba(80, 137, 190, .25) 19px);
+  color: #173b7a;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, .2);
+  font-family: 'Caveat', cursive;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.pages-manager-modal .thumbnail-paper::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 5px;
+  width: 5px;
+  background: radial-gradient(circle, #cbd5e1 0 2px, transparent 2.5px) center top / 5px 18px repeat-y;
+  content: '';
+}
+
+.pages-manager-modal .thumbnail-lines {
+  display: grid;
+}
+
+.pages-manager-modal .thumbnail-line {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pages-manager-modal .thumbnail-empty {
+  color: rgba(23, 59, 122, .45);
+  font-family: 'Roboto', sans-serif;
+  font-size: 9px;
+}
+
+.pages-manager-modal .thumbnail-name {
+  display: block;
+  overflow: hidden;
+  margin: 7px 2px 1px;
+  color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pages-manager-modal .page-thumbnail small {
+  display: block;
+  margin-inline: 2px;
+  color: rgba(226, 232, 240, .62);
+  font-size: 9px;
+}
+
+.pages-manager-modal .new-page-card {
+  min-height: 0;
+  aspect-ratio: 3 / 4.85;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border: 1px dashed #1677f2;
+  color: #dbeafe;
+  text-align: center;
+}
+
+.pages-manager-modal .new-page-plus {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  background: #1677f2;
+  color: #fff;
+  box-shadow: 0 7px 18px rgba(22, 119, 242, .3);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.pages-manager-modal .new-page-card small {
+  font-size: 11px;
+}
+
+.pages-manager-modal .pages-modal-footer {
+  flex: 0 0 auto;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(11, 21, 34, 0), #0b1522 28%);
+}
+
+.pages-manager-modal .pages-modal-footer button {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: #1a2a3c;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+ion-action-sheet.page-actions-sheet {
+  --background: #0d1825;
+  --color: #fff;
+  --button-color: #fff;
+  --button-color-selected: #fff;
+}
+
+ion-alert.page-delete-alert {
+  --background: #0d1825;
+  --backdrop-opacity: .7;
+}
+
+.page-delete-alert .alert-title,
+.page-delete-alert .alert-message {
+  color: #fff;
+}
+
+.page-delete-alert .alert-button {
+  color: #dbeafe;
+}
+
+.page-delete-alert .alert-button-role-destructive {
+  color: #ff4d5f;
+}
+
+@media (max-width: 350px) {
+  .pages-manager-modal .pages-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 700px) {
+  ion-modal.pages-manager-modal {
+    --width: min(760px, calc(100% - 40px));
+    --height: min(760px, calc(100% - 40px));
+    --border-radius: 22px;
+    --backdrop-opacity: .72;
+  }
+
+  .pages-manager-modal .pages-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-inline: 22px;
+  }
+}

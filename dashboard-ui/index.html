@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notlab Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-icon">📘</span>
+          <span class="brand-text">Notlab</span>
+        </div>
+
+        <div class="actions">
+          <button class="icon-button" id="toggleSearch" aria-label="Recherche">
+            <span>⌕</span>
+          </button>
+          <button class="icon-button" aria-label="Options">
+            <span>⋮</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="search-box hidden" id="searchBox">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Rechercher un cahier..."
+          aria-label="Rechercher un cahier"
+        />
+      </div>
+
+      <nav class="tabs" aria-label="Navigation des notes">
+        <button class="tab active" data-tab="all">Mes notes</button>
+        <button class="tab" data-tab="shared">Partagées</button>
+        <button class="tab" data-tab="favorites">Favoris</button>
+      </nav>
+
+      <div class="toolbar-row">
+        <button class="sort-button" id="sortToggle">
+          <span>⇅</span>
+          <span id="sortLabel">Trier par date</span>
+        </button>
+      </div>
+
+      <main class="notes-list" id="notesList"></main>
+    </div>
+
+    <button class="fab" id="newNoteButton" aria-label="Nouvelle note">＋ <span>Nouvelle note</span></button>
+
+    <script src="script.js"></script>
+  </body>
+</html>

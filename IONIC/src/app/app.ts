@@ -1,14 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { AfterViewInit, Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonModal, IonPopover, IonToast } from '@ionic/angular';
+import { IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonPopover, IonToast } from '@ionic/angular';
 import { BackendPage, NotlabBackendService } from './notlab-backend.service';
 import { addIcons } from 'ionicons';
 import {
   addCircleOutline,
+  arrowRedoOutline,
   arrowBackOutline,
+  arrowUndoOutline,
   attachOutline,
+  bookOutline,
   cameraOutline,
   checkboxOutline,
   chevronBackOutline,
@@ -24,11 +28,13 @@ import {
   imageOutline,
   informationCircleOutline,
   micOutline,
+  pencilOutline,
   peopleOutline,
   personOutline,
   pricetagOutline,
   reorderFourOutline,
   reorderThreeOutline,
+  searchOutline,
   sendOutline,
   settingsOutline,
   trashOutline,
@@ -36,8 +42,11 @@ import {
 
 addIcons({
   addCircleOutline,
+  arrowRedoOutline,
   arrowBackOutline,
+  arrowUndoOutline,
   attachOutline,
+  bookOutline,
   cameraOutline,
   checkboxOutline,
   chevronBackOutline,
@@ -53,11 +62,13 @@ addIcons({
   imageOutline,
   informationCircleOutline,
   micOutline,
+  pencilOutline,
   peopleOutline,
   personOutline,
   pricetagOutline,
   reorderFourOutline,
   reorderThreeOutline,
+  searchOutline,
   sendOutline,
   settingsOutline,
   trashOutline,
@@ -116,18 +127,23 @@ interface NotebookPage {
   createdAt: string;
   lines: NotebookLine[];
   ownerUserId: string;
+  paperType?: 'lined' | 'draft';
 }
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonModal, IonPopover, IonToast, RouterOutlet],
+  imports: [CommonModule, FormsModule, IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonPopover, IonToast, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App {
+export class App implements AfterViewInit {
   @ViewChild('composerInput') composerInput?: IonInput;
+  @ViewChild('drawingCanvas') drawingCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('attachmentPicker') attachmentPicker?: ElementRef<HTMLInputElement>;
+  @ViewChild('galleryPicker') galleryPicker?: ElementRef<HTMLInputElement>;
+  @ViewChild('cameraPicker') cameraPicker?: ElementRef<HTMLInputElement>;
+  @ViewChild('filePicker') filePicker?: ElementRef<HTMLInputElement>;
 
   pageNumber = 1;
   totalPages = 0;
@@ -143,10 +159,15 @@ export class App {
   isCheckingInvitations = false;
   showPageManager = false;
   showProjectOptions = false;
+  showDrawingTools = false;
+  isDrawingMode = false;
+  drawingTool: 'pencil' | 'eraser' = 'pencil';
+  drawingSize = 4;
   showLineMenu = false;
   showLineMoreMenu = false;
   showLineDeleteActions = false;
   showLabelEditor = false;
+  showLabelManageActions = false;
   showCustomLabelControls = false;
   showAuthorPopover = false;
   authorPopoverEvent?: Event;
@@ -155,6 +176,7 @@ export class App {
   lineMenuPosition = { top: 0, left: 0 };
   showAttachmentActions = false;
   showAllPages = false;
+  pageSearchQuery = '';
   showPageActions = false;
   showDeleteAlert = false;
   showRenameAlert = false;
@@ -189,16 +211,21 @@ export class App {
   private pagePressTimer?: number;
   private pagePressConsumed = false;
   private linePressTimer?: number;
+  private drawingPressTimer?: number;
+  private drawingPressConsumed = false;
+  private isDrawing = false;
+  private drawingHistory: string[] = [];
+  private drawingRedoHistory: string[] = [];
   private readonly authorPalette = ['#2563eb', '#059669', '#7c3aed', '#db2777', '#d97706', '#0891b2', '#4f46e5', '#be123c'];
   readonly labelPresets: LabelStyle[] = [
-    { id: 'yellow', name: 'Jaune', backgroundColor: '#FDE68A', textColor: '#1F2937', opacity: 0.9 },
-    { id: 'blue', name: 'Bleu', backgroundColor: '#BFDBFE', textColor: '#0F172A', opacity: 0.9 },
-    { id: 'green', name: 'Vert', backgroundColor: '#BBF7D0', textColor: '#14532D', opacity: 0.9 },
-    { id: 'pink', name: 'Rose', backgroundColor: '#FBCFE8', textColor: '#4C0519', opacity: 0.9 },
-    { id: 'purple', name: 'Violet', backgroundColor: '#DDD6FE', textColor: '#2E1065', opacity: 0.9 },
-    { id: 'orange', name: 'Orange', backgroundColor: '#FED7AA', textColor: '#7C2D12', opacity: 0.9 },
+    { id: 'yellow', name: 'Important', backgroundColor: '#FDE68A', textColor: '#1F2937', opacity: 0.9 },
+    { id: 'blue', name: 'Design', backgroundColor: '#BFDBFE', textColor: '#0F172A', opacity: 0.9 },
+    { id: 'green', name: 'Développement', backgroundColor: '#BBF7D0', textColor: '#14532D', opacity: 0.9 },
+    { id: 'purple', name: 'Google', backgroundColor: '#DDD6FE', textColor: '#2E1065', opacity: 0.9 },
+    { id: 'pink', name: 'Test', backgroundColor: '#FBCFE8', textColor: '#4C0519', opacity: 0.9 },
+    { id: 'orange', name: 'Démo', backgroundColor: '#FED7AA', textColor: '#7C2D12', opacity: 0.9 },
   ];
-  labelRecentStyles: LabelStyle[] = [];
+  labelRecentStyles: LabelStyle[] = this.loadRecentLabelStyles();
   labelEditorDraft: LabelStyle = this.labelPresets[0];
   labelEditorSelectedId = this.labelPresets[0].id;
 
@@ -230,7 +257,171 @@ export class App {
   get currentProjectId(): string { return localStorage.getItem('notlab.activeProjectId') || `project:${this.currentUserId}`; }
   get currentProjectTitle(): string { return localStorage.getItem('notlab.activeProjectTitle') || 'Projet Notlab'; }
   get collaborationIconName(): string { return this.collaboratorCount > 1 ? 'people-outline' : 'person-outline'; }
+  get canUndoDrawing(): boolean { return this.drawingHistory.length > 1; }
+  get canRedoDrawing(): boolean { return this.drawingRedoHistory.length > 0; }
+
+  ngAfterViewInit() {
+    this.resizeDrawingCanvas();
+    setTimeout(() => this.loadDrawing(), 0);
+  }
+
+  @HostListener('document:click', ['$event'])
+  closePanelsOnOutsideClick(event: Event) {
+    const target = event.target as HTMLElement | null;
+    if (!target || target.closest(
+      '.typography-popover, .emoji-picker, .line-menu, .composer-wrap, .editor-header, '
+      + '.pages-modal-layout, .label-editor-panel, .modal-sheet, ion-popover, ion-action-sheet, ion-alert, ion-modal'
+    )) return;
+
+    this.closeFloatingPanels();
+  }
+
+  private closeFloatingPanels() {
+    this.showTypography = false;
+    this.showEmojiPicker = false;
+    this.showProjectOptions = false;
+    this.closeLineMenus();
+    this.showAuthorPopover = false;
+    this.showDrawingTools = false;
+  }
+
+  toggleDrawingMode() {
+    if (this.drawingPressConsumed) {
+      this.drawingPressConsumed = false;
+      return;
+    }
+    this.isDrawingMode = !this.isDrawingMode;
+    if (this.isDrawingMode) this.showDrawingTools = false;
+  }
+
+  startDrawingToolPress() {
+    this.cancelDrawingToolPress();
+    this.drawingPressConsumed = false;
+    this.drawingPressTimer = window.setTimeout(() => {
+      this.drawingPressConsumed = true;
+      this.showDrawingTools = true;
+      this.isDrawingMode = true;
+    }, 500);
+  }
+
+  cancelDrawingToolPress() {
+    if (this.drawingPressTimer) window.clearTimeout(this.drawingPressTimer);
+    this.drawingPressTimer = undefined;
+  }
+
+  selectDrawingTool(tool: 'pencil' | 'eraser') {
+    this.drawingTool = tool;
+    this.isDrawingMode = true;
+  }
+
+  setDrawingSize(size: number) {
+    this.drawingSize = Math.max(1, Math.min(24, size));
+  }
+
+  private resizeDrawingCanvas() {
+    const canvas = this.drawingCanvas?.nativeElement;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(rect.width * ratio));
+    canvas.height = Math.max(1, Math.round(rect.height * ratio));
+    const context = canvas.getContext('2d');
+    context?.scale(ratio, ratio);
+    this.drawingHistory = [];
+    this.saveDrawingSnapshot();
+  }
+
+  @HostListener('window:resize')
+  onWindowResize() { this.resizeDrawingCanvas(); }
+
+  startDrawing(event: PointerEvent) {
+    if (!this.isDrawingMode) return;
+    const canvas = this.drawingCanvas?.nativeElement;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    const point = this.drawingPoint(event, canvas);
+    context.beginPath();
+    context.moveTo(point.x, point.y);
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.lineWidth = this.drawingSize;
+    context.strokeStyle = this.drawingTool === 'eraser' ? '#ffffff' : '#4b16c7';
+    this.isDrawing = true;
+    canvas.setPointerCapture(event.pointerId);
+  }
+
+  draw(event: PointerEvent) {
+    if (!this.isDrawing) return;
+    const canvas = this.drawingCanvas?.nativeElement;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    const point = this.drawingPoint(event, canvas);
+    context.lineTo(point.x, point.y);
+    context.stroke();
+  }
+
+  stopDrawing() {
+    if (!this.isDrawing) return;
+    this.isDrawing = false;
+    this.saveDrawingSnapshot();
+  }
+
+  undoDrawing() {
+    if (this.drawingHistory.length <= 1) return;
+    const current = this.drawingHistory.pop();
+    if (current) this.drawingRedoHistory.push(current);
+    this.restoreDrawing(this.drawingHistory[this.drawingHistory.length - 1]);
+  }
+
+  redoDrawing() {
+    const next = this.drawingRedoHistory.pop();
+    if (!next) return;
+    this.drawingHistory.push(next);
+    this.restoreDrawing(next);
+  }
+
+  private drawingPoint(event: PointerEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  private saveDrawingSnapshot() {
+    const canvas = this.drawingCanvas?.nativeElement;
+    if (!canvas) return;
+    const snapshot = canvas.toDataURL();
+    if (this.drawingHistory[this.drawingHistory.length - 1] === snapshot) return;
+    this.drawingHistory.push(snapshot);
+    this.drawingRedoHistory = [];
+    localStorage.setItem(this.drawingStorageKey(), snapshot);
+  }
+
+  private restoreDrawing(snapshot?: string) {
+    const canvas = this.drawingCanvas?.nativeElement;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context || !snapshot) return;
+    const image = new Image();
+    image.onload = () => {
+      context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+      context.drawImage(image, 0, 0, canvas.clientWidth, canvas.clientHeight);
+      localStorage.setItem(this.drawingStorageKey(), snapshot);
+    };
+    image.src = snapshot;
+  }
+
+  private loadDrawing() {
+    const snapshot = localStorage.getItem(this.drawingStorageKey());
+    if (!snapshot) return;
+    this.restoreDrawing(snapshot);
+    this.drawingHistory = [snapshot];
+  }
+
+  private drawingStorageKey() { return `notlab.editor.drawing.${this.currentPage?.pageId || this.pageNumber}`; }
   get currentPage(): NotebookPage | undefined { return this.pages.find((page) => page.pageNumber === this.pageNumber); }
+  get filteredPages(): NotebookPage[] {
+    const query = this.pageSearchQuery.trim().toLowerCase();
+    if (!query) return this.pages;
+    return this.pages.filter((page) => page.name.toLowerCase().includes(query) || String(page.pageNumber).includes(query));
+  }
   get isCurrentUserPageOwner(): boolean {
     return !!this.currentPage && (!this.currentPage.ownerUserId || this.currentPage.ownerUserId === this.currentUserId);
   }
@@ -281,6 +472,14 @@ export class App {
     buttons.push({ text: 'Annuler', role: 'cancel' });
     return buttons;
   }
+  get labelManageActionButtons() {
+    return [
+      { text: 'Modifier le label', icon: 'create-outline', handler: () => this.beginEditSelectedLabel(false) },
+      { text: 'Changer de couleur', icon: 'pricetag-outline', handler: () => this.beginEditSelectedLabel(true) },
+      { text: 'Supprimer le label', icon: 'trash-outline', role: 'destructive', handler: () => this.removeSelectedLabel() },
+      { text: 'Annuler', role: 'cancel' },
+    ];
+  }
   get canGoPrevious(): boolean { return this.pageNumber > 1; }
   get canGoNext(): boolean { return this.pageNumber < this.totalPages; }
   authorForLine(line: NotebookLine): AuthorView {
@@ -316,11 +515,33 @@ export class App {
   openLabelEditor() {
     if (!this.selectedLine) return;
     this.showLineMoreMenu = false;
-    this.showCustomLabelControls = false;
+    this.showEmojiPicker = false;
+    this.showTypography = false;
+
+    if (this.selectedLine.labelStyle) {
+      this.showLabelManageActions = true;
+      return;
+    }
+
+    this.prepareLabelEditor(false);
+  }
+
+  beginEditSelectedLabel(showCustomControls = false) {
+    this.showLabelManageActions = false;
+    this.prepareLabelEditor(showCustomControls);
+  }
+
+  private prepareLabelEditor(showCustomControls = false) {
+    if (!this.selectedLine) return;
     const currentStyle = this.selectedLine.labelStyle;
-    const selectedPreset = currentStyle ? this.labelPresets.find((preset) => preset.id === currentStyle.id) : this.labelPresets[0];
+    const selectedPreset = currentStyle
+      ? this.labelPresets.find((preset) => preset.id === currentStyle.id)
+      : this.labelPresets[0];
+
     this.labelEditorSelectedId = selectedPreset ? selectedPreset.id : 'custom';
     this.labelEditorDraft = currentStyle ? { ...currentStyle } : { ...this.labelPresets[0] };
+    this.showCustomLabelControls = showCustomControls || (!!currentStyle && !selectedPreset);
+    if (showCustomControls) this.labelEditorSelectedId = 'custom';
     this.showLabelEditor = true;
   }
 
@@ -329,20 +550,49 @@ export class App {
     this.showCustomLabelControls = false;
   }
 
+  startCustomLabel() {
+    this.showCustomLabelControls = true;
+    this.labelEditorSelectedId = 'custom';
+    const isPresetName = this.labelPresets.some((preset) => preset.name === this.labelEditorDraft.name);
+    this.labelEditorDraft = {
+      ...this.labelEditorDraft,
+      id: 'custom',
+      name: this.selectedLine?.labelStyle?.name || (isPresetName ? 'Label' : this.labelEditorDraft.name) || 'Label',
+    };
+  }
+
   applyLabelStyle(style: LabelStyle) {
     if (!this.selectedLine) return;
-    const nextStyle: LabelStyle = { ...style, opacity: Number(style.opacity ?? 0.9) };
-    this.updateSelectedLine({ labelStyle: nextStyle });
-    this.labelRecentStyles = [nextStyle, ...this.labelRecentStyles.filter((item) => item.id !== nextStyle.id)].slice(0, 4);
+    const nextStyle: LabelStyle = {
+      ...style,
+      name: String(style.name || 'Label').trim() || 'Label',
+      opacity: Number(style.opacity ?? 0.9),
+    };
+    const updated = this.updateSelectedLine({ labelStyle: nextStyle });
+    if (!updated) return;
+
+    const styleKey = nextStyle.name + ':' + nextStyle.backgroundColor + ':' + nextStyle.textColor;
+    this.labelRecentStyles = [
+      nextStyle,
+      ...this.labelRecentStyles.filter((item) => item.name + ':' + item.backgroundColor + ':' + item.textColor !== styleKey),
+    ].slice(0, 6);
+    this.persistRecentLabelStyles();
+    this.syncLineLabel(updated);
     this.showLabelEditor = false;
+    this.showLabelManageActions = false;
     this.showCustomLabelControls = false;
+    this.showSuccess('Label appliqué.');
   }
 
   removeSelectedLabel() {
     if (!this.selectedLine) return;
-    this.updateSelectedLine({ labelStyle: undefined });
+    const updated = this.updateSelectedLine({ labelStyle: undefined });
+    if (!updated) return;
+    this.syncLineLabel(updated);
     this.showLabelEditor = false;
+    this.showLabelManageActions = false;
     this.showCustomLabelControls = false;
+    this.showSuccess('Label supprimé.');
   }
 
   chooseLabelPreset(style: LabelStyle) {
@@ -351,21 +601,33 @@ export class App {
     this.showCustomLabelControls = false;
   }
 
+  chooseRecentLabel(style: LabelStyle) {
+    this.labelEditorSelectedId = style.id;
+    this.labelEditorDraft = { ...style };
+    this.showCustomLabelControls = style.id.startsWith('custom-');
+  }
+
+  onCustomLabelName(value: string) {
+    this.labelEditorDraft = { ...this.labelEditorDraft, name: value };
+    this.labelEditorSelectedId = 'custom';
+  }
+
   onCustomLabelColor(property: 'backgroundColor' | 'textColor', value: string) {
-    if (!this.labelEditorDraft) return;
     this.labelEditorDraft = { ...this.labelEditorDraft, [property]: value };
     this.labelEditorSelectedId = 'custom';
   }
 
   onCustomLabelOpacity(value: number) {
-    if (!this.labelEditorDraft) return;
     this.labelEditorDraft = { ...this.labelEditorDraft, opacity: Number(value) };
+    this.labelEditorSelectedId = 'custom';
   }
 
   applyCurrentLabelDraft() {
+    const preset = this.labelPresets.find((item) => item.id === this.labelEditorSelectedId);
+    const isCustom = this.labelEditorSelectedId === 'custom' || this.labelEditorSelectedId.startsWith('custom-');
     const style: LabelStyle = {
-      id: this.labelEditorSelectedId === 'custom' ? `custom-${Date.now()}` : this.labelEditorSelectedId,
-      name: this.labelEditorSelectedId === 'custom' ? 'Personnalisé' : (this.labelPresets.find((preset) => preset.id === this.labelEditorSelectedId)?.name || 'Personnalisé'),
+      id: isCustom ? 'custom-' + Date.now() : this.labelEditorSelectedId,
+      name: String(this.labelEditorDraft.name || preset?.name || 'Label').trim() || 'Label',
       backgroundColor: this.labelEditorDraft.backgroundColor,
       textColor: this.labelEditorDraft.textColor,
       opacity: Number(this.labelEditorDraft.opacity ?? 0.9),
@@ -373,6 +635,38 @@ export class App {
     this.applyLabelStyle(style);
   }
 
+  private syncLineLabel(line: NotebookLine) {
+    this.backend.updateElement(
+      line.id,
+      this.currentUserId,
+      line.text,
+      line.color,
+      line.labelStyle ?? null,
+    ).subscribe({
+      error: () => this.showSuccess('Label enregistré localement. Synchronisation en attente.'),
+    });
+  }
+
+  private loadRecentLabelStyles(): LabelStyle[] {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('notlab.label.recentStyles') || '[]') as LabelStyle[];
+      return Array.isArray(parsed)
+        ? parsed.filter((style) => style?.id && style?.backgroundColor && style?.textColor).map((style) => this.normalizeLabelStyle(style)!).slice(0, 6)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private normalizeLabelStyle(style?: LabelStyle): LabelStyle | undefined {
+    if (!style) return undefined;
+    const oldPresetNames = ['Jaune', 'Bleu', 'Vert', 'Rose', 'Violet', 'Orange'];
+    const preset = this.labelPresets.find((item) => item.id === style.id);
+    return preset && oldPresetNames.includes(style.name) ? { ...style, name: preset.name } : style;
+  }
+  private persistRecentLabelStyles() {
+    localStorage.setItem('notlab.label.recentStyles', JSON.stringify(this.labelRecentStyles));
+  }
   asLabelBackground(style?: LabelStyle): string {
     if (!style) return '';
     return this.hexToRgba(style.backgroundColor, style.opacity ?? 0.9);
@@ -446,6 +740,7 @@ export class App {
     this.pagePressConsumed = false;
     this.selectedPage = undefined;
     this.showAllPages = false;
+    this.pageSearchQuery = '';
   }
 
   selectPage(page: number) {
@@ -465,7 +760,7 @@ export class App {
     this.lines = page.lines;
     this.closeLineMenus();
   }
-  addPage() {
+  addPage(paperType: NotebookPage['paperType'] = 'lined') {
     this.saveCurrentPage();
     const pageNumber = this.pages.length + 1;
     const page: NotebookPage = {
@@ -475,6 +770,7 @@ export class App {
       createdAt: this.toLocalCreatedAt(),
       lines: [],
       ownerUserId: this.currentUserId,
+      paperType,
     };
     this.pages = [...this.pages, page];
     this.syncPageState();
@@ -586,7 +882,12 @@ export class App {
   }
   createPageFromProjectMenu() {
     this.showProjectOptions = false;
-    this.addPage();
+    this.addPage('draft');
+  }
+
+  returnToDefaultPage() {
+    this.showProjectOptions = false;
+    this.openPage(1);
   }
 
   deletePageFromProjectMenu() {
@@ -651,7 +952,7 @@ export class App {
       this.showLineMoreMenu = false;
       this.draftText = '';
       this.saveCurrentPage();
-      this.backend.updateElement(updated.id, this.currentUserId, text, updated.color).subscribe({
+      this.backend.updateElement(updated.id, this.currentUserId, text, updated.color, updated.labelStyle).subscribe({
         next: () => this.showSuccess('Message modifié pour tout le monde.'),
         error: () => this.showSuccess('Modification locale enregistrée. Synchronisation en attente.'),
       });
@@ -703,6 +1004,9 @@ export class App {
 
   selectLine(line: NotebookLine, rect?: DOMRect | null) {
     this.selectedLine = line;
+    this.showEmojiPicker = false;
+    this.showTypography = false;
+    this.showAttachmentActions = false;
     this.showLineMenu = true;
     this.showLineMoreMenu = false;
     this.draftText = line.text;
@@ -753,6 +1057,7 @@ export class App {
       action: 'save_element', element_id: copy.id, page_id: page?.pageId || `page-${this.pageNumber}`,
       user_id: this.currentUserId, author_name: this.currentUserName,
       author_tag: this.initialsFor(this.currentUserName), line_index: Math.max(0, index + 1), content: copy.text, color: copy.color,
+      label_style: copy.labelStyle,
     }).subscribe({ error: () => this.showSuccess('Copie locale créée. Synchronisation en attente.') });
     this.closeLineMenus();
   }
@@ -835,12 +1140,13 @@ export class App {
     this.updateSelectedLine({ align });
   }
 
-  private updateSelectedLine(changes: Partial<NotebookLine>) {
-    if (!this.selectedLine || !this.canManageLine(this.selectedLine)) return;
+  private updateSelectedLine(changes: Partial<NotebookLine>): NotebookLine | undefined {
+    if (!this.selectedLine || !this.canManageLine(this.selectedLine)) return undefined;
     const updated = { ...this.selectedLine, ...changes };
     this.lines = this.lines.map((line) => line.id === updated.id ? updated : line);
     this.selectedLine = updated;
     this.saveCurrentPage();
+    return updated;
   }
   editSelectedLine() {
     if (!this.selectedLine || !this.canManageLine(this.selectedLine)) return;
@@ -1001,10 +1307,12 @@ export class App {
 
   openAttachmentPicker(type: 'image' | 'photo' | 'file') {
     this.attachmentType = type;
-    const picker = this.attachmentPicker?.nativeElement;
+    const picker = type === 'image'
+      ? this.galleryPicker?.nativeElement
+      : type === 'photo'
+        ? this.cameraPicker?.nativeElement
+        : this.filePicker?.nativeElement;
     if (!picker) return;
-    picker.accept = type === 'file' ? '*/*' : 'image/*';
-    picker.capture = type === 'photo' ? 'environment' : '';
     picker.value = '';
     picker.click();
   }
@@ -1069,6 +1377,7 @@ export class App {
           line_index: index,
           content: line.text,
           color: line.color,
+          label_style: line.labelStyle,
         };
       });
       this.backend.syncBatch(elements).subscribe({
@@ -1129,6 +1438,7 @@ export class App {
               userId: authorId,
               authorId,
               authorName: line.authorName || (authorId === this.currentUserId ? this.currentUserName : undefined),
+              labelStyle: this.normalizeLabelStyle(line.labelStyle),
             };
           }),
         }));

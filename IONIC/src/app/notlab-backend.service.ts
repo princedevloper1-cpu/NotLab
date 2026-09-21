@@ -2,6 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map, timeout } from 'rxjs';
 
+export interface BackendLabelStyle {
+  id: string;
+  name: string;
+  backgroundColor: string;
+  textColor: string;
+  opacity: number;
+}
 export interface BackendElement {
   action: 'save_element';
   element_id: string;
@@ -12,6 +19,7 @@ export interface BackendElement {
   line_index: number;
   content: string;
   color: string;
+  label_style?: BackendLabelStyle | null;
 }
 
 export interface BackendResponse {
@@ -139,8 +147,8 @@ export class NotlabBackendService {
     return this.postAction({ action: 'delete_user', user_id: userId });
   }
 
-  updateElement(elementId: string, userId: string, content: string, color: string): Observable<BackendResponse> {
-    return this.postAction({ action: 'update_element', element_id: elementId, user_id: userId, content, color });
+  updateElement(elementId: string, userId: string, content: string, color: string, labelStyle?: BackendLabelStyle | null): Observable<BackendResponse> {
+    return this.postAction({ action: 'update_element', element_id: elementId, user_id: userId, content, color, label_style: labelStyle });
   }
 
   deleteElement(elementId: string, userId: string): Observable<BackendResponse> {

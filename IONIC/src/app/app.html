@@ -9,9 +9,30 @@
       <button class="icon-button" type="button" aria-label="Options du projet" (click)="showProjectOptions = !showProjectOptions"><ion-icon name="ellipsis-vertical-outline"></ion-icon></button>
     </header>
 
-    <section class="notebook-paper" aria-label="Page du notebook">
+    <section class="notebook-paper" [class.draft-paper]="currentPage?.paperType === 'draft'" aria-label="Page du notebook">
+      <div class="drawing-toolbar" aria-label="Outils de dessin">
+        <button type="button" aria-label="Annuler le dessin" [disabled]="!canUndoDrawing" (click)="undoDrawing()"><ion-icon name="arrow-undo-outline"></ion-icon></button>
+        <button type="button" aria-label="Rétablir le dessin" [disabled]="!canRedoDrawing" (click)="redoDrawing()"><ion-icon name="arrow-redo-outline"></ion-icon></button>
+        <button
+          class="pencil-tool-button"
+          [class.active]="isDrawingMode"
+          type="button"
+          aria-label="Crayon"
+          (click)="toggleDrawingMode()"
+          (pointerdown)="startDrawingToolPress()"
+          (pointerup)="cancelDrawingToolPress()"
+          (pointercancel)="cancelDrawingToolPress()"
+          (pointerleave)="cancelDrawingToolPress()"
+        ><ion-icon name="pencil-outline"></ion-icon></button>
+        <div class="drawing-tools-popover" *ngIf="showDrawingTools">
+          <button type="button" [class.active]="drawingTool === 'pencil'" (click)="selectDrawingTool('pencil')"><ion-icon name="pencil-outline"></ion-icon><span>Crayon</span></button>
+          <button type="button" [class.active]="drawingTool === 'eraser'" (click)="selectDrawingTool('eraser')"><ion-icon name="trash-outline"></ion-icon><span>Gomme</span></button>
+          <label>Size <input type="range" min="1" max="24" [value]="drawingSize" (input)="setDrawingSize(+$any($event.target).value)"><output>{{ drawingSize }}px</output></label>
+        </div>
+      </div>
       <div class="paper-date">{{ creationDate }}</div>
-      <div class="paper-lines">
+      <canvas #drawingCanvas class="drawing-canvas" [class.drawing-active]="isDrawingMode" (pointerdown)="startDrawing($event)" (pointermove)="draw($event)" (pointerup)="stopDrawing()" (pointercancel)="stopDrawing()" (pointerleave)="stopDrawing()"></canvas>
+      <div class="paper-lines" [class.draft-lines]="currentPage?.paperType === 'draft'">
         <div class="notebook-row" *ngFor="let line of lines">
           <div class="author-marker-slot">
             <button
@@ -25,7 +46,7 @@
               (click)="openAuthorPopover(line, $event)"
             >
               <img *ngIf="author.avatarUrl" [src]="author.avatarUrl" [alt]="author.name">
-              <span *ngIf="!author.avatarUrl">{{ author.isCurrentUser ? 'Moi' : author.initials }}</span>
+              <span *ngIf="!author.avatarUrl">{{ author.initials }}</span>
             </button>
           </div>
           <div
@@ -36,19 +57,19 @@
             [style.font-weight]="line.bold ? 700 : 400"
             [style.font-style]="line.italic ? 'italic' : 'normal'"
             [style.text-decoration]="(line.underline ? 'underline ' : '') + (line.strike ? 'line-through' : '')"
-            [style.color]="line.labelStyle ? line.labelStyle.textColor : line.color"
-            [style.background]="line.labelStyle ? asLabelBackground(line.labelStyle) : ''"
-            [style.border-radius]="line.labelStyle ? '8px' : ''"
-            [style.padding]="line.labelStyle ? '4px 8px' : '3px 7px'"
+            [style.color]="line.color"
             [style.text-align]="line.align"
             (pointerdown)="startLinePress(line, $event)"
             (pointerup)="cancelLinePress()"
             (pointercancel)="cancelLinePress()"
             (pointerleave)="cancelLinePress()"
             (contextmenu)="$event.preventDefault(); selectLine(line, $any($event.currentTarget).getBoundingClientRect())"
-          >{{ line.text }}</div>
+          >
+            <span class="line-copy" [class.has-label]="!!line.labelStyle" [style.background]="asLabelBackground(line.labelStyle)">{{ line.text }}</span>
+          </div>
         </div>
       </div>
+      <div class="paper-page-number" aria-label="Numéro de page">{{ pageNumber }}</div>
     </section>
 
     <div class="composer-wrap">
@@ -92,7 +113,6 @@
       <button *ngIf="canManageSelectedLine" class="more-line-button" type="button" aria-label="Plus d'options" (click)="toggleLineMoreMenu()"><ion-icon name="ellipsis-horizontal"></ion-icon><span>Plus</span></button>
     </div>
     <div class="line-menu line-more-menu" *ngIf="selectedLine && showLineMoreMenu" [style.top.px]="lineMenuPosition.top" [style.left.px]="lineMenuPosition.left">
-      <button type="button" aria-label="Modifier" (click)="editSelectedLine()"><ion-icon name="create-outline"></ion-icon><span>Modifier</span></button>
       <button type="button" aria-label="Gras" [class.active]="selectedLine.bold" (click)="toggleSelectedLineStyle('bold')"><strong>B</strong><span>Gras</span></button>
       <button type="button" aria-label="Italique" [class.active]="selectedLine.italic" (click)="toggleSelectedLineStyle('italic')"><i>I</i><span>Italique</span></button>
       <button type="button" aria-label="Souligner" [class.active]="selectedLine.underline" (click)="toggleSelectedLineStyle('underline')"><u>U</u><span>Souligner</span></button>
@@ -104,7 +124,7 @@
   </main>
 
   <div class="project-message" *ngIf="projectMessage">{{ projectMessage }}</div>
-  <ion-popover [isOpen]="showProjectOptions" (didDismiss)="showProjectOptions = false"><ng-template><ion-content class="compact-menu"><button type="button"><ion-icon name="information-circle-outline"></ion-icon> Informations du projet</button><button type="button"><ion-icon name="create-outline"></ion-icon> Renommer le projet</button><button type="button" (click)="handleProjectOption('pages')"><ion-icon name="documents-outline"></ion-icon> Toutes les pages</button><button type="button" (click)="createPageFromProjectMenu()"><ion-icon name="add-circle-outline"></ion-icon> Créer une page</button><button type="button" (click)="deletePageFromProjectMenu()"><ion-icon name="trash-outline"></ion-icon> Supprimer la page</button><button type="button"><ion-icon name="trash-outline"></ion-icon> Corbeille</button><button type="button" (click)="handleProjectOption('settings')"><ion-icon name="settings-outline"></ion-icon> Paramètres du projet</button><button type="button" (click)="handleProjectOption('sync')"><ion-icon name="cloud-upload-outline"></ion-icon> Synchroniser</button></ion-content></ng-template></ion-popover>
+  <ion-popover [isOpen]="showProjectOptions" (didDismiss)="showProjectOptions = false"><ng-template><ion-content class="compact-menu"><button type="button"><ion-icon name="information-circle-outline"></ion-icon> Informations du projet</button><button type="button"><ion-icon name="create-outline"></ion-icon> Renommer le projet</button><button type="button" (click)="handleProjectOption('pages')"><ion-icon name="documents-outline"></ion-icon> Toutes les pages</button><button type="button" (click)="createPageFromProjectMenu()"><ion-icon name="add-circle-outline"></ion-icon> Nouvelle feuille blanche</button><button *ngIf="currentPage?.paperType === 'draft'" type="button" (click)="returnToDefaultPage()"><ion-icon name="book-outline"></ion-icon> Retour à la feuille par défaut</button><button type="button" (click)="deletePageFromProjectMenu()"><ion-icon name="trash-outline"></ion-icon> Supprimer la page</button><button type="button"><ion-icon name="trash-outline"></ion-icon> Corbeille</button><button type="button" (click)="handleProjectOption('settings')"><ion-icon name="settings-outline"></ion-icon> Paramètres du projet</button><button type="button" (click)="handleProjectOption('sync')"><ion-icon name="cloud-upload-outline"></ion-icon> Synchroniser</button></ion-content></ng-template></ion-popover>
 
   <div
     class="pages-manager-overlay"
@@ -112,17 +132,22 @@
     role="dialog"
     aria-modal="true"
     aria-labelledby="pages-manager-title"
+    (click)="closePageManager()"
   >
-    <section class="pages-modal-layout">
+    <section class="pages-modal-layout" (click)="$event.stopPropagation()">
       <div class="pages-modal-header">
         <strong id="pages-manager-title">Toutes les pages</strong>
         <button type="button" class="close-btn" aria-label="Fermer" (click)="closePageManager()">×</button>
       </div>
+      <label class="page-search">
+        <ion-icon name="search-outline"></ion-icon>
+        <input type="search" placeholder="Rechercher un numéro ou un titre" [(ngModel)]="pageSearchQuery" aria-label="Rechercher une page">
+      </label>
 
       <div class="pages-grid">
         <button
           class="page-thumbnail"
-          *ngFor="let page of pages"
+          *ngFor="let page of filteredPages"
           [class.current-page]="page.pageNumber === pageNumber"
           type="button"
           (click)="selectPage(page.pageNumber)"
@@ -142,6 +167,8 @@
           <small>{{ formatPageDate(page.createdAt) }}</small>
         </button>
 
+        <p class="pages-empty" *ngIf="!filteredPages.length">Aucune page trouvée.</p>
+
         <button class="new-page-card" type="button" (click)="addPage()">
           <span class="new-page-plus">+</span>
           <small>Nouvelle page</small>
@@ -159,7 +186,7 @@
       <div class="author-popover-card" *ngIf="selectedAuthor as author">
         <div class="author-popover-avatar" [style.background]="author.color">
           <img *ngIf="author.avatarUrl" [src]="author.avatarUrl" [alt]="author.name">
-          <span *ngIf="!author.avatarUrl">{{ author.isCurrentUser ? 'Moi' : author.initials }}</span>
+          <span *ngIf="!author.avatarUrl">{{ author.initials }}</span>
         </div>
         <div class="author-popover-copy">
           <strong>{{ author.name }}</strong>
@@ -169,52 +196,61 @@
       </div>
     </ng-template>
   </ion-popover>
+  <ion-action-sheet cssClass="label-manage-sheet" [isOpen]="showLabelManageActions" header="Gérer le label" [buttons]="labelManageActionButtons" (didDismiss)="showLabelManageActions = false"></ion-action-sheet>
   <ion-action-sheet [isOpen]="showLineDeleteActions" header="Supprimer le message" [buttons]="lineDeleteActionButtons" (didDismiss)="showLineDeleteActions = false"></ion-action-sheet>
   <ion-alert [isOpen]="showRenameAlert" header="Renommer la page" [inputs]="renameAlertInputs" [buttons]="renameAlertButtons" (didDismiss)="showRenameAlert = false"></ion-alert>
   <ion-alert cssClass="page-delete-alert" [isOpen]="showDeleteAlert" header="Supprimer cette page ?" message="Cette action supprimera son contenu. Elle ne pourra pas être annulée." [buttons]="deleteAlertButtons" (didDismiss)="showDeleteAlert = false"></ion-alert>
   <ion-toast [isOpen]="showToast" [message]="toastMessage" [color]="toastColor" duration="2200" position="bottom" (didDismiss)="showToast = false"></ion-toast>
 
-  <ion-modal [isOpen]="showLabelEditor" (didDismiss)="closeLabelEditor()">
-    <ng-template>
-      <ion-content class="label-modal-content">
-        <div class="label-modal-header">
-          <strong>Label</strong>
-          <button type="button" class="close-btn" (click)="closeLabelEditor()">×</button>
-        </div>
+  <div
+    class="label-editor-overlay"
+    *ngIf="showLabelEditor"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="label-editor-title"
+    (click)="closeLabelEditor()"
+  >
+    <section class="label-editor-panel" (click)="$event.stopPropagation()">
+      <header class="label-modal-header">
+        <span class="label-header-spacer"></span>
+        <strong id="label-editor-title">Appliquer un label</strong>
+        <button type="button" class="label-header-close" aria-label="Fermer" (click)="closeLabelEditor()">×</button>
+      </header>
 
-        <div class="label-preview-panel">
-          <div class="label-preview-chip"
-               [style.background]="asLabelBackground(labelEditorDraft)"
-               [style.color]="labelEditorDraft.textColor"
-               [style.opacity]="labelEditorDraft.opacity.toString()">
-            {{ selectedLabelText }}
-          </div>
-        </div>
+      <div class="label-editor-scroll">
+        <section class="label-preview-panel">
+          <span class="label-preview-title">Aperçu (votre texte)</span>
+          <span class="label-preview-chip" [style.background]="asLabelBackground(labelEditorDraft)" [style.color]="labelEditorDraft.textColor">{{ selectedLabelText }}</span>
+          <small class="label-name-preview">Label : {{ labelEditorDraft.name || 'Label' }}</small>
+        </section>
 
-        <div class="label-section" *ngIf="labelRecentStyles.length">
-          <div class="label-section-title">Récents</div>
+        <section class="label-section" *ngIf="labelRecentStyles.length">
+          <div class="label-section-title">Labels récents</div>
           <div class="label-presets-grid recent-grid">
-            <button type="button" class="label-preset-btn" *ngFor="let style of labelRecentStyles" (click)="applyLabelStyle(style)">
+            <button type="button" class="label-preset-btn" *ngFor="let style of labelRecentStyles" [class.active]="labelEditorDraft.id === style.id" (click)="chooseRecentLabel(style)">
               <span class="preset-preview" [style.background]="asLabelBackground(style)" [style.color]="style.textColor">{{ selectedLabelText }}</span>
+              <small>{{ style.name }}</small>
             </button>
           </div>
-        </div>
+        </section>
 
-        <div class="label-section">
-          <div class="label-section-title">Styles</div>
+        <section class="label-section">
+          <div class="label-section-title">Labels par défaut</div>
           <div class="label-presets-grid">
             <button type="button" class="label-preset-btn" *ngFor="let style of labelPresets" [class.active]="labelEditorSelectedId === style.id" (click)="chooseLabelPreset(style)">
               <span class="preset-preview" [style.background]="asLabelBackground(style)" [style.color]="style.textColor">{{ selectedLabelText }}</span>
+              <small>{{ style.name }}</small>
             </button>
           </div>
-        </div>
+        </section>
 
-        <div class="label-actions-row">
-          <button type="button" class="secondary-action" (click)="showCustomLabelControls = !showCustomLabelControls">Personnaliser</button>
-          <button *ngIf="selectedLine?.labelStyle" type="button" class="secondary-action danger" (click)="removeSelectedLabel()">Retirer le label</button>
-        </div>
+        <button type="button" class="create-custom-label" (click)="startCustomLabel()">+ Créer un label personnalisé</button>
 
-        <div class="custom-label-panel" *ngIf="showCustomLabelControls">
+        <section class="custom-label-panel" *ngIf="showCustomLabelControls">
+          <label class="label-name-field">
+            <span>Nom du label</span>
+            <input type="text" maxlength="24" [value]="labelEditorDraft.name" placeholder="Important" (input)="onCustomLabelName($any($event.target).value)">
+          </label>
           <label class="color-field">
             <span>Couleur du fond</span>
             <input type="color" [value]="labelEditorDraft.backgroundColor" (input)="onCustomLabelColor('backgroundColor', $any($event.target).value)">
@@ -227,17 +263,18 @@
             <span>Opacité</span>
             <input type="range" min="0.3" max="1" step="0.05" [value]="labelEditorDraft.opacity" (input)="onCustomLabelOpacity(+($any($event.target).value))">
           </label>
-        </div>
+        </section>
+      </div>
 
-        <div class="label-modal-footer">
-          <button type="button" class="modal-cancel" (click)="closeLabelEditor()">Annuler</button>
-          <button type="button" class="modal-apply" (click)="applyCurrentLabelDraft()">Appliquer</button>
-        </div>
-      </ion-content>
-    </ng-template>
-  </ion-modal>
-
-  <input #attachmentPicker class="hidden-attachment-picker" type="file" (change)="onAttachmentSelected($event)">
+      <footer class="label-modal-footer">
+        <button type="button" class="modal-cancel" (click)="closeLabelEditor()">Annuler</button>
+        <button type="button" class="modal-apply" (click)="applyCurrentLabelDraft()">Appliquer</button>
+      </footer>
+    </section>
+  </div>
+  <input #galleryPicker class="hidden-attachment-picker" type="file" accept="image/*" (change)="onAttachmentSelected($event)">
+  <input #cameraPicker class="hidden-attachment-picker" type="file" accept="image/*" capture="environment" (change)="onAttachmentSelected($event)">
+  <input #filePicker class="hidden-attachment-picker" type="file" accept="*/*" (change)="onAttachmentSelected($event)">
   <ion-action-sheet [isOpen]="showAttachmentActions" header="Ajouter au cahier" [buttons]="attachmentActionButtons" (didDismiss)="showAttachmentActions = false"></ion-action-sheet>
 
   <div class="collab-overlay" *ngIf="showCollabSheet" (click)="closeCollabSheet()">

@@ -250,6 +250,16 @@ ion-alert.page-delete-alert {
   color: #ff4d5f;
 }
 
+ion-action-sheet.label-manage-sheet {
+  --background: #ffffff;
+  --color: #102b58;
+  --button-color: #102b58;
+  --backdrop-opacity: .68;
+}
+
+ion-action-sheet.label-manage-sheet .action-sheet-button.action-sheet-destructive {
+  color: #ef3340;
+}
 @media (max-width: 350px) {
   .pages-manager-overlay .pages-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -40,7 +40,7 @@ function setupDatabase() {
   initSheet(ss, SHEETS.USERS,
     ['User ID', "Nom d'utilisateur", 'Telephone', "Date d'inscription", 'Statut'], '#1E3A8A');
   initSheet(ss, SHEETS.ELEMENTS,
-    ['Element ID', 'Page ID', 'User ID', 'Nom Auteur', 'Tag Auteur', 'Ligne Index', 'Contenu', 'Couleur', 'Derniere Modification'], '#0F9D58');
+    ['Element ID', 'Page ID', 'User ID', 'Nom Auteur', 'Tag Auteur', 'Ligne Index', 'Contenu', 'Couleur', 'Derniere Modification', 'Label JSON'], '#0F9D58');
   initSheet(ss, SHEETS.STROKES,
     ['Stroke ID', 'Page ID', 'User ID', 'Type Outil', 'Couleur', 'Epaisseur', 'Points JSON', 'Derniere Modification'], '#E65100');
   initSheet(ss, SHEETS.PAGES,
@@ -139,7 +139,7 @@ function ensureDatabase() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var definitions = [
     [SHEETS.USERS, ['User ID', "Nom d'utilisateur", 'Telephone', "Date d'inscription", 'Statut'], '#1E3A8A'],
-    [SHEETS.ELEMENTS, ['Element ID', 'Page ID', 'User ID', 'Nom Auteur', 'Tag Auteur', 'Ligne Index', 'Contenu', 'Couleur', 'Derniere Modification'], '#0F9D58'],
+    [SHEETS.ELEMENTS, ['Element ID', 'Page ID', 'User ID', 'Nom Auteur', 'Tag Auteur', 'Ligne Index', 'Contenu', 'Couleur', 'Derniere Modification', 'Label JSON'], '#0F9D58'],
     [SHEETS.STROKES, ['Stroke ID', 'Page ID', 'User ID', 'Type Outil', 'Couleur', 'Epaisseur', 'Points JSON', 'Derniere Modification'], '#E65100'],
     [SHEETS.PAGES, ['Page ID', 'Numero Page', 'Titre', 'Nombre Lignes', 'Confidentiel', 'Derniere Modification', 'Owner User ID'], '#5E35B1'],
     [SHEETS.CHAT, ['Message ID', 'Project ID', 'Page ID', 'User ID', 'Nom Auteur', 'Auteur Tag', 'Contenu', 'Type', 'Date', 'Statut'], '#2563EB'],
@@ -151,6 +151,12 @@ function ensureDatabase() {
     if (!sheet) {
       sheet = initSheet(ss, definition[0], definition[1], definition[2]);
       if (definition[0] === SHEETS.USERS) sheet.getRange('C:C').setNumberFormat('@');
+    } else {
+      var headers = definition[1];
+      var existingLastHeader = String(sheet.getRange(1, headers.length).getDisplayValue() || '');
+      if (existingLastHeader !== String(headers[headers.length - 1])) {
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      }
     }
   });
 }
@@ -421,6 +427,11 @@ function deleteUser(data) {
   deleteRowsByValue(ss.getSheetByName(SHEETS.USERS), 1, userId);
   return jsonResponse({ status: 'success', message: 'Compte et donnees utilisateur supprimes.' });
 }
+function serializeLabelStyle(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+}
 function saveElement(data, now) {
   var elementId = data.element_id || createId('EL');
   SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ELEMENTS).appendRow([
@@ -432,7 +443,8 @@ function saveElement(data, now) {
     data.line_index === undefined ? -1 : data.line_index,
     data.content || '',
     data.color || '#121212',
-    now
+    now,
+    serializeLabelStyle(data.label_style || data.labelStyle)
   ]);
   return jsonResponse({ status: 'success', message: 'Element texte enregistre.', element_id: elementId });
 }
@@ -453,6 +465,9 @@ function updateElement(data, now) {
   sheet.getRange(row, 7).setValue(String(data.content || ''));
   if (data.color) sheet.getRange(row, 8).setValue(data.color);
   sheet.getRange(row, 9).setValue(now);
+  if (Object.prototype.hasOwnProperty.call(data, 'label_style') || Object.prototype.hasOwnProperty.call(data, 'labelStyle')) {
+    sheet.getRange(row, 10).setValue(serializeLabelStyle(data.label_style || data.labelStyle));
+  }
   return jsonResponse({ status: 'success', message: 'Message modifie.', element_id: elementId });
 }
 

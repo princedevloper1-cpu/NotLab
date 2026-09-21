@@ -435,6 +435,7 @@ export class App {
 
   openPageManager() {
     this.saveCurrentPage();
+    this.showProjectOptions = false;
     this.showPageActions = false;
     this.selectedPage = undefined;
     this.showAllPages = true;

@@ -106,51 +106,53 @@
   <div class="project-message" *ngIf="projectMessage">{{ projectMessage }}</div>
   <ion-popover [isOpen]="showProjectOptions" (didDismiss)="showProjectOptions = false"><ng-template><ion-content class="compact-menu"><button type="button"><ion-icon name="information-circle-outline"></ion-icon> Informations du projet</button><button type="button"><ion-icon name="create-outline"></ion-icon> Renommer le projet</button><button type="button" (click)="handleProjectOption('pages')"><ion-icon name="documents-outline"></ion-icon> Toutes les pages</button><button type="button" (click)="createPageFromProjectMenu()"><ion-icon name="add-circle-outline"></ion-icon> Créer une page</button><button type="button" (click)="deletePageFromProjectMenu()"><ion-icon name="trash-outline"></ion-icon> Supprimer la page</button><button type="button"><ion-icon name="trash-outline"></ion-icon> Corbeille</button><button type="button" (click)="handleProjectOption('settings')"><ion-icon name="settings-outline"></ion-icon> Paramètres du projet</button><button type="button" (click)="handleProjectOption('sync')"><ion-icon name="cloud-upload-outline"></ion-icon> Synchroniser</button></ion-content></ng-template></ion-popover>
 
-  <ion-modal class="pages-manager-modal" [isOpen]="showAllPages" (didDismiss)="closePageManager()">
-    <ng-template>
-      <ion-content class="pages-modal-content" [scrollY]="false">
-        <div class="pages-modal-layout">
-          <div class="pages-modal-header">
-            <strong>Toutes les pages</strong>
-            <button type="button" class="close-btn" aria-label="Fermer" (click)="closePageManager()">×</button>
-          </div>
+  <div
+    class="pages-manager-overlay"
+    *ngIf="showAllPages"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="pages-manager-title"
+  >
+    <section class="pages-modal-layout">
+      <div class="pages-modal-header">
+        <strong id="pages-manager-title">Toutes les pages</strong>
+        <button type="button" class="close-btn" aria-label="Fermer" (click)="closePageManager()">×</button>
+      </div>
 
-          <div class="pages-grid">
-            <button
-              class="page-thumbnail"
-              *ngFor="let page of pages"
-              [class.current-page]="page.pageNumber === pageNumber"
-              type="button"
-              (click)="selectPage(page.pageNumber)"
-              (pointerdown)="startPagePress(page)"
-              (pointerup)="endPagePress()"
-              (pointercancel)="endPagePress()"
-              (pointerleave)="endPagePress()"
-              (contextmenu)="openPageActions(page, $event)"
-            >
-              <span class="thumbnail-paper">
-                <span class="thumbnail-lines" *ngIf="page.lines.length; else emptyPagePreview">
-                  <span class="thumbnail-line" *ngFor="let previewLine of page.lines | slice:0:5">{{ previewLine.text | slice:0:34 }}</span>
-                </span>
-                <ng-template #emptyPagePreview><span class="thumbnail-empty">Page vide</span></ng-template>
-              </span>
-              <span class="thumbnail-name">{{ page.name }}</span>
-              <small>{{ formatPageDate(page.createdAt) }}</small>
-            </button>
+      <div class="pages-grid">
+        <button
+          class="page-thumbnail"
+          *ngFor="let page of pages"
+          [class.current-page]="page.pageNumber === pageNumber"
+          type="button"
+          (click)="selectPage(page.pageNumber)"
+          (pointerdown)="startPagePress(page)"
+          (pointerup)="endPagePress()"
+          (pointercancel)="endPagePress()"
+          (pointerleave)="endPagePress()"
+          (contextmenu)="openPageActions(page, $event)"
+        >
+          <span class="thumbnail-paper">
+            <span class="thumbnail-lines" *ngIf="page.lines?.length; else emptyPagePreview">
+              <span class="thumbnail-line" *ngFor="let previewLine of page.lines | slice:0:5">{{ previewLine.text | slice:0:34 }}</span>
+            </span>
+            <ng-template #emptyPagePreview><span class="thumbnail-empty">Page vide</span></ng-template>
+          </span>
+          <span class="thumbnail-name">{{ page.name }}</span>
+          <small>{{ formatPageDate(page.createdAt) }}</small>
+        </button>
 
-            <button class="new-page-card" type="button" (click)="addPage()">
-              <span class="new-page-plus">+</span>
-              <small>Nouvelle page</small>
-            </button>
-          </div>
+        <button class="new-page-card" type="button" (click)="addPage()">
+          <span class="new-page-plus">+</span>
+          <small>Nouvelle page</small>
+        </button>
+      </div>
 
-          <div class="pages-modal-footer">
-            <button type="button" (click)="closePageManager()">Fermer</button>
-          </div>
-        </div>
-      </ion-content>
-    </ng-template>
-  </ion-modal>
+      <div class="pages-modal-footer">
+        <button type="button" (click)="closePageManager()">Fermer</button>
+      </div>
+    </section>
+  </div>
   <ion-action-sheet cssClass="page-actions-sheet" [isOpen]="showPageActions" [header]="selectedPage?.name || 'Options de la page'" [buttons]="pageActionButtons" (didDismiss)="closePageActions()"></ion-action-sheet>
   <ion-popover class="author-info-popover" [isOpen]="showAuthorPopover" [event]="authorPopoverEvent" side="right" alignment="center" (didDismiss)="closeAuthorPopover()">
     <ng-template>

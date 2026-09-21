@@ -1,0 +1,40 @@
+html,
+body {
+	margin: 0;
+	min-width: 320px;
+	min-height: 100%;
+}
+
+@font-face {
+	font-family: 'Caveat';
+	src: url('/fonts/caveat.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Patrick Hand';
+	src: url('/fonts/patrick_hand.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Satisfy';
+	src: url('/fonts/satisfy.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Roboto';
+	src: url('/fonts/roboto.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Poppins';
+	src: url('/fonts/poppins.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Montserrat';
+	src: url('/fonts/montserrat.ttf') format('truetype');
+}
+
+body {
+	overflow-x: hidden;
+}

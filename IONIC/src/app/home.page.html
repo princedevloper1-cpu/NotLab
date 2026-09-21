@@ -1,0 +1,41 @@
+<main class="home-shell">
+  <header class="home-header">
+    <div class="brand"><span class="brand-icon">▤</span><strong>Notlab</strong></div>
+    <div class="header-actions">
+      <button type="button" aria-label="Rechercher" (click)="toggleSearch()">⌕</button>
+      <div class="account-menu-wrap">
+        <button type="button" aria-label="Options du compte" [attr.aria-expanded]="showAccountMenu" (click)="toggleAccountMenu()">⋮</button>
+        <div class="account-menu" *ngIf="showAccountMenu">
+          <strong>{{ userName }}</strong>
+          <button type="button" [disabled]="isAccountBusy" (click)="logout()">Se déconnecter</button>
+          <button class="delete-account" type="button" [disabled]="isAccountBusy" (click)="deleteAccount()">Supprimer mon compte</button>
+          <small *ngIf="accountMessage">{{ accountMessage }}</small>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="search-bar" *ngIf="isSearchActive"><input type="search" placeholder="Rechercher une note" [(ngModel)]="searchQuery"></div>
+
+  <nav class="home-tabs" aria-label="Sections">
+    <button [class.active]="selectedTabIndex === 0" type="button" (click)="selectTab(0)">Mes notes</button>
+    <button [class.active]="selectedTabIndex === 1" type="button" (click)="selectTab(1)">Partagées</button>
+    <button [class.active]="selectedTabIndex === 2" type="button" (click)="selectTab(2)">Favoris</button>
+  </nav>
+
+  <section class="home-content">
+    <div class="notebook-list">
+      <p class="empty-notebooks" *ngIf="!filteredNotebooks.length">Aucune note pour le moment.</p>
+      <a class="notebook-card" *ngFor="let notebook of filteredNotebooks" routerLink="/notebook">
+        <div class="notebook-thumb"><span></span></div>
+        <div class="notebook-copy">
+          <h3>{{ notebook.title }}</h3>
+          <p>{{ notebook.people }} · {{ notebook.pages }} {{ notebook.pages === 1 ? 'page' : 'pages' }}</p>
+        </div>
+        <div class="notebook-meta"><time>{{ notebook.date }}</time><button type="button" aria-label="Options de la note" (click)="toggleOptions(notebook.id, $event)">⋮</button><div class="notebook-options" *ngIf="openOptionsId === notebook.id"><button type="button" (click)="toggleFavorite(notebook.id, $event)"><span class="menu-icon">{{ notebook.isFavorite ? '★' : '☆' }}</span>{{ notebook.isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris' }}</button><button class="delete-option" type="button" (click)="deleteNotebook(notebook.id, $event)">Supprimer</button></div></div>
+      </a>
+    </div>
+  </section>
+
+  <button class="new-note" type="button" (click)="createNewNotebook()"><span>＋</span>Nouvelle note</button>
+</main>

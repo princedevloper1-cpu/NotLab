@@ -1,0 +1,61 @@
+<main class="auth-shell">
+  <section class="auth-card" [class.form-card]="mode !== 'welcome'" [class.success-card]="mode === 'success'">
+    <button *ngIf="mode !== 'welcome' && mode !== 'success'" class="back-button" type="button" aria-label="Retour" (click)="goBack()">‹</button>
+
+    <ng-container *ngIf="mode === 'welcome'">
+      <div class="welcome-art" aria-hidden="true">
+        <div class="paper-preview"><span>De meilleures<br>idées<br>commencent<br>ici.</span><i></i></div>
+        <div class="pen-preview"></div>
+      </div>
+      <div class="brand-mark">N</div>
+      <p class="eyebrow">NOTLAB</p>
+      <h1>Écrire. Partager.<br>Aller plus loin.</h1>
+      <p class="description">Ton espace pour transformer chaque idée en quelque chose de concret.</p>
+      <div class="welcome-actions">
+        <button class="primary-action" type="button" (click)="showRegister()">Créer un compte</button>
+        <button class="secondary-action" type="button" (click)="showLogin()">Se connecter</button>
+      </div>
+      <div class="pager" aria-label="Étape 1 sur 3"><span class="active"></span><span></span><span></span></div>
+    </ng-container>
+
+    <ng-container *ngIf="mode === 'register' || mode === 'login'">
+      <div class="compact-brand"><span class="brand-mark">N</span><span>NOTLAB</span></div>
+      <h1>{{ mode === 'register' ? 'Créer un compte' : 'Se connecter' }}</h1>
+      <p class="description">{{ mode === 'register' ? 'Rejoignez Notlab et commencez à écrire vos idées partout.' : 'Retrouvez vos idées et continuez là où vous vous êtes arrêté.' }}</p>
+
+      <form class="registration-form" (submit)="$event.preventDefault(); mode === 'register' ? submitRegistration() : login()">
+        <label for="name">Nom d'utilisateur</label>
+        <ion-input id="name" type="text" fill="outline" placeholder="John" [value]="name" (ionInput)="name = $any($event).detail.value || ''"></ion-input>
+
+        <label for="phone">Numéro de téléphone</label>
+        <div class="phone-field">
+          <select class="country-select" aria-label="Pays et indicatif" [value]="selectedCountryIso" (change)="selectCountry($any($event.target).value)">
+            <option *ngFor="let country of countries" [value]="country.iso">{{ country.flag }} {{ country.name }} ({{ country.dialCode }})</option>
+          </select>
+          <div class="phone-input-row">
+            <span class="dial-code">{{ selectedCountry.dialCode }}</span>
+            <ion-input id="phone" type="tel" inputmode="numeric" [placeholder]="selectedCountry.placeholder" [value]="phone" (ionInput)="phone = $any($event).detail.value || ''"></ion-input>
+          </div>
+        </div>
+        <small class="field-hint">{{ selectedCountry.localLength }} chiffres · le code {{ selectedCountry.dialCode }} est ajouté automatiquement.</small>
+
+        <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+        <button class="primary-action form-action" type="submit" [disabled]="isSubmitting">
+          <ion-spinner *ngIf="isSubmitting" name="crescent"></ion-spinner>
+          <span *ngIf="!isSubmitting">{{ mode === 'register' ? 'Créer mon compte' : 'Se connecter' }}</span>
+        </button>
+      </form>
+
+      <p class="helper">{{ mode === 'register' ? 'En créant un compte, vous acceptez nos Conditions d’utilisation et notre Politique de confidentialité.' : 'Pas encore de compte ?' }} <button type="button" (click)="mode === 'register' ? showLogin() : showRegister()">{{ mode === 'register' ? 'Se connecter' : 'Créer un compte' }}</button></p>
+    </ng-container>
+
+    <ng-container *ngIf="mode === 'success'">
+      <div class="success-mark"><span class="brand-mark">N</span><b>✓</b></div>
+      <p class="eyebrow">NOTLAB</p>
+      <h1>Bienvenue sur Notlab !</h1>
+      <p class="description">Votre compte est prêt.<br>Commencez à écrire vos idées dès maintenant.</p>
+      <button class="primary-action form-action" type="button" (click)="continueToHome()">Commencer</button>
+      <p class="success-note">De grandes idées vous attendent !</p>
+    </ng-container>
+  </section>
+</main>

@@ -1,0 +1,167 @@
+<ion-app *ngIf="isEditorRoute">
+  <main class="editor-shell">
+    <header class="editor-header">
+      <button class="icon-button" type="button" aria-label="Retour aux notebooks" (click)="goHome()"><ion-icon name="arrow-back-outline"></ion-icon></button>
+      <button class="icon-button" type="button" aria-label="Page précédente" [disabled]="!canGoPrevious" (click)="previousPage()"><ion-icon name="chevron-back-outline"></ion-icon></button>
+      <button class="page-button" type="button" (click)="openPageManager()">{{ totalPages ? pageNumber + ' / ' + totalPages : 'Aucune page' }}</button>
+      <button class="icon-button" type="button" aria-label="Page suivante" [disabled]="!canGoNext" (click)="nextPage()"><ion-icon name="chevron-forward-outline"></ion-icon></button>
+      <button class="icon-button" type="button" aria-label="Membres" (click)="openCollabSheet()"><ion-icon name="people-outline"></ion-icon></button>
+      <button class="icon-button" type="button" aria-label="Options du projet" (click)="showProjectOptions = !showProjectOptions"><ion-icon name="ellipsis-vertical-outline"></ion-icon></button>
+    </header>
+
+    <section class="notebook-paper" aria-label="Page du notebook">
+      <div class="paper-date">{{ creationDate }}</div>
+      <div class="paper-lines">
+        <div class="notebook-row" *ngFor="let line of lines">
+          <div class="author-marker-slot">
+            <button
+              *ngIf="line.text.trim() && authorForLine(line) as author"
+              class="author-marker"
+              [class.current-user]="author.isCurrentUser"
+              type="button"
+              [style.background]="author.color"
+              [attr.aria-label]="'Afficher ' + author.name"
+              (pointerdown)="$event.stopPropagation()"
+              (click)="openAuthorPopover(line, $event)"
+            >
+              <img *ngIf="author.avatarUrl" [src]="author.avatarUrl" [alt]="author.name">
+              <span *ngIf="!author.avatarUrl">{{ author.isCurrentUser ? 'Moi' : author.initials }}</span>
+            </button>
+          </div>
+          <div
+            class="notebook-line"
+            [class.selected]="selectedLine?.id === line.id"
+            [style.font-family]="fontFamilyFor(line.font)"
+            [style.font-size.px]="line.size"
+            [style.font-weight]="line.bold ? 700 : 400"
+            [style.font-style]="line.italic ? 'italic' : 'normal'"
+            [style.text-decoration]="(line.underline ? 'underline ' : '') + (line.strike ? 'line-through' : '')"
+            [style.color]="line.color"
+            [style.text-align]="line.align"
+            (pointerdown)="startLinePress(line, $event)"
+            (pointerup)="cancelLinePress()"
+            (pointercancel)="cancelLinePress()"
+            (pointerleave)="cancelLinePress()"
+            (contextmenu)="$event.preventDefault(); selectLine(line, $any($event.currentTarget).getBoundingClientRect())"
+          >{{ line.text }}</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="composer-wrap">
+      <div class="typography-popover" *ngIf="showTypography">
+        <div class="popover-title">Typographie</div>
+        <div class="font-options">
+          <button type="button" *ngFor="let font of ['Handwriting 1', 'Handwriting 2', 'Handwriting 3', 'Roboto', 'Poppins', 'Montserrat']" [class.active]="typography.font === font" (click)="updateTypography('font', font)">{{ font }}</button>
+        </div>
+        <div class="format-row">
+          <button type="button" [class.active]="typography.bold" (click)="updateTypography('bold', !typography.bold)">B</button>
+          <button type="button" [class.active]="typography.italic" (click)="updateTypography('italic', !typography.italic)"><i>I</i></button>
+          <button type="button" [class.active]="typography.underline" (click)="updateTypography('underline', !typography.underline)"><u>U</u></button>
+          <button type="button" [class.active]="typography.strike" (click)="updateTypography('strike', !typography.strike)"><s>S</s></button>
+        </div>
+        <div class="format-row alignment-row">
+          <button type="button" [class.active]="typography.align === 'left'" (click)="updateTypography('align', 'left')"><ion-icon name="reorder-three-outline"></ion-icon></button>
+          <button type="button" [class.active]="typography.align === 'center'" (click)="updateTypography('align', 'center')"><ion-icon name="reorder-four-outline"></ion-icon></button>
+          <button type="button" [class.active]="typography.align === 'right'" (click)="updateTypography('align', 'right')"><ion-icon name="reorder-four-outline"></ion-icon></button>
+        </div>
+        <label class="size-control">Taille {{ typography.size }}<input type="range" min="12" max="32" [value]="typography.size" (input)="updateTypography('size', +$any($event.target).value)"></label>
+        <label class="color-control">Couleur <input type="color" [value]="typography.color" (input)="updateTypography('color', $any($event.target).value)"></label>
+      </div>
+
+      <div class="emoji-picker" *ngIf="showEmojiPicker">
+        <button type="button" *ngFor="let emoji of ['😀', '👍', '💡', '❤️', '🚀', '✅', '✨', '🎉']" (click)="chooseEmoji(emoji)">{{ emoji }}</button>
+      </div>
+
+      <div class="writing-bar">
+        <button class="type-button" type="button" aria-label="Options de typographie" (click)="showTypography = !showTypography">A</button>
+        <ion-input #composerInput class="composer-input" [value]="draftText" [placeholder]="editingLineId ? 'Modifier la ligne...' : 'Écrire une ligne sur le cahier...'" (ionInput)="onDraftInput($any($event).detail.value || '')" (keyup.enter)="sendLine()"></ion-input>
+        <button class="composer-icon" type="button" aria-label="Emoji" (click)="showEmojiPicker = !showEmojiPicker"><ion-icon name="happy-outline"></ion-icon></button>
+        <button class="composer-icon" type="button" aria-label="Pièce jointe" (click)="showAttachmentActions = true"><ion-icon name="attach-outline"></ion-icon></button>
+        <button class="send-button" type="button" [attr.aria-label]="editingLineId ? 'Enregistrer la modification' : 'Envoyer'" (click)="sendLine()"><ion-icon name="send-outline"></ion-icon></button>
+      </div>
+    </div>
+
+    <div class="line-menu" *ngIf="selectedLine && showLineMenu && !showLineMoreMenu" [style.top.px]="lineMenuPosition.top" [style.left.px]="lineMenuPosition.left">
+      <button type="button" aria-label="Copier" (click)="copySelectedLine()"><ion-icon name="copy-outline"></ion-icon><span>Copier</span></button>
+      <button type="button" aria-label="Dupliquer" (click)="duplicateSelectedLine()"><ion-icon name="documents-outline"></ion-icon><span>Dupliquer</span></button>
+      <button class="destructive-line-action" type="button" aria-label="Supprimer" (click)="openLineDeleteActions()"><ion-icon name="trash-outline"></ion-icon><span>Supprimer</span></button>
+      <button *ngIf="canManageSelectedLine" class="more-line-button" type="button" aria-label="Plus d'options" (click)="toggleLineMoreMenu()"><ion-icon name="ellipsis-horizontal"></ion-icon><span>Plus</span></button>
+    </div>
+    <div class="line-menu line-more-menu" *ngIf="selectedLine && showLineMoreMenu" [style.top.px]="lineMenuPosition.top" [style.left.px]="lineMenuPosition.left">
+      <button type="button" aria-label="Modifier" (click)="editSelectedLine()"><ion-icon name="create-outline"></ion-icon><span>Modifier</span></button>
+      <button type="button" aria-label="Gras" [class.active]="selectedLine.bold" (click)="toggleSelectedLineStyle('bold')"><strong>B</strong><span>Gras</span></button>
+      <button type="button" aria-label="Italique" [class.active]="selectedLine.italic" (click)="toggleSelectedLineStyle('italic')"><i>I</i><span>Italique</span></button>
+      <button type="button" aria-label="Souligner" [class.active]="selectedLine.underline" (click)="toggleSelectedLineStyle('underline')"><u>U</u><span>Souligner</span></button>
+      <button type="button" aria-label="Aligner à gauche" [class.active]="selectedLine.align === 'left'" (click)="setSelectedLineAlign('left')"><ion-icon name="reorder-three-outline"></ion-icon><span>Gauche</span></button>
+      <button type="button" aria-label="Centrer" [class.active]="selectedLine.align === 'center'" (click)="setSelectedLineAlign('center')"><ion-icon name="reorder-four-outline"></ion-icon><span>Centrer</span></button>
+      <button type="button" aria-label="Aligner à droite" [class.active]="selectedLine.align === 'right'" (click)="setSelectedLineAlign('right')"><ion-icon name="reorder-four-outline"></ion-icon><span>Droite</span></button>
+    </div>
+  </main>
+
+  <div class="project-message" *ngIf="projectMessage">{{ projectMessage }}</div>
+  <ion-popover [isOpen]="showProjectOptions" (didDismiss)="showProjectOptions = false"><ng-template><ion-content class="compact-menu"><button type="button"><ion-icon name="information-circle-outline"></ion-icon> Informations du projet</button><button type="button"><ion-icon name="create-outline"></ion-icon> Renommer le projet</button><button type="button" (click)="handleProjectOption('pages')"><ion-icon name="documents-outline"></ion-icon> Toutes les pages</button><button type="button" (click)="createPageFromProjectMenu()"><ion-icon name="add-circle-outline"></ion-icon> Créer une page</button><button type="button" (click)="deletePageFromProjectMenu()"><ion-icon name="trash-outline"></ion-icon> Supprimer la page</button><button type="button"><ion-icon name="trash-outline"></ion-icon> Corbeille</button><button type="button" (click)="handleProjectOption('settings')"><ion-icon name="settings-outline"></ion-icon> Paramètres du projet</button><button type="button" (click)="handleProjectOption('sync')"><ion-icon name="cloud-upload-outline"></ion-icon> Synchroniser</button></ion-content></ng-template></ion-popover>
+
+  <ion-modal [isOpen]="showAllPages" (didDismiss)="showAllPages = false">
+    <ng-template>
+      <ion-content class="pages-modal-content">
+        <div class="pages-modal-header"><strong>Toutes les pages</strong><div class="pages-header-actions"><button class="header-new-page" type="button" (click)="addPage()">+ Nouvelle page</button><button type="button" class="close-btn" (click)="showAllPages = false">×</button></div></div>
+        <div class="pages-grid">
+          <button
+            class="page-thumbnail"
+            *ngFor="let page of pages"
+            [class.current-page]="page.pageNumber === pageNumber"
+            type="button"
+            (click)="selectPage(page.pageNumber)"
+            (pointerdown)="startPagePress(page)"
+            (pointerup)="endPagePress()"
+            (pointerleave)="endPagePress()"
+          >
+            <span class="thumbnail-paper"><span *ngIf="page.lines.length">{{ page.lines[0].text | slice:0:28 }}</span><span class="thumbnail-empty" *ngIf="!page.lines.length">Page vide</span></span>
+            <span class="thumbnail-name">{{ page.name }}</span>
+            <small>{{ page.createdAt | date:'d MMM yyyy' }}</small>
+          </button>
+          <button class="new-page-card" type="button" (click)="addPage()"><span>+</span><small>Nouvelle page</small></button>
+        </div>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <ion-action-sheet [isOpen]="showPageActions" header="Options de la page" [buttons]="pageActionButtons" (didDismiss)="showPageActions = false"></ion-action-sheet>
+  <ion-popover class="author-info-popover" [isOpen]="showAuthorPopover" [event]="authorPopoverEvent" side="right" alignment="center" (didDismiss)="closeAuthorPopover()">
+    <ng-template>
+      <div class="author-popover-card" *ngIf="selectedAuthor as author">
+        <div class="author-popover-avatar" [style.background]="author.color">
+          <img *ngIf="author.avatarUrl" [src]="author.avatarUrl" [alt]="author.name">
+          <span *ngIf="!author.avatarUrl">{{ author.isCurrentUser ? 'Moi' : author.initials }}</span>
+        </div>
+        <div class="author-popover-copy">
+          <strong>{{ author.name }}</strong>
+          <small *ngIf="author.isCurrentUser">Vous</small>
+          <small class="online-status" *ngIf="!author.isCurrentUser && author.isOnline">En ligne</small>
+        </div>
+      </div>
+    </ng-template>
+  </ion-popover>
+  <ion-action-sheet [isOpen]="showLineDeleteActions" header="Supprimer le message" [buttons]="lineDeleteActionButtons" (didDismiss)="showLineDeleteActions = false"></ion-action-sheet>
+  <ion-alert [isOpen]="showRenameAlert" header="Renommer la page" [inputs]="renameAlertInputs" [buttons]="renameAlertButtons" (didDismiss)="showRenameAlert = false"></ion-alert>
+  <ion-alert [isOpen]="showDeleteAlert" header="Supprimer cette page ?" message="Cette action ne pourra pas être annulée." [buttons]="deleteAlertButtons" (didDismiss)="showDeleteAlert = false"></ion-alert>
+  <ion-toast [isOpen]="showToast" [message]="toastMessage" duration="2200" position="bottom" (didDismiss)="showToast = false"></ion-toast>
+
+  <input #attachmentPicker class="hidden-attachment-picker" type="file" (change)="onAttachmentSelected($event)">
+  <ion-action-sheet [isOpen]="showAttachmentActions" header="Ajouter au cahier" [buttons]="attachmentActionButtons" (didDismiss)="showAttachmentActions = false"></ion-action-sheet>
+
+  <div class="collab-overlay" *ngIf="showCollabSheet" (click)="closeCollabSheet()">
+    <div class="modal-sheet" (click)="$event.stopPropagation()">
+      <div class="sheet-header"><strong>Partage et collaboration</strong><button class="close-btn" type="button" (click)="closeCollabSheet()">×</button></div>
+      <p class="empty-collab" *ngIf="!collaborators.length">Aucun collaborateur pour le moment.</p>
+      <div class="member-list" *ngIf="collaborators.length"><div class="member-row" *ngFor="let member of collaborators"><div class="avatar" [style.background]="member.color">{{ member.initials }}</div><span>{{ member.name }}</span><button class="permission-pill" type="button" (click)="onTogglePermission(member)">{{ member.canWrite ? 'Peut modifier' : 'Lecture seule' }}</button></div></div>
+      <button class="contact-picker-button" type="button" (click)="chooseContact()">Choisir un contact</button>
+      <div class="invite-form"><span>{{ countryCode }}</span><ion-input [value]="phoneValue" placeholder="1234 5678" (ionInput)="onPhoneInput($any($event).detail.value || '')"></ion-input></div>
+      <ion-input class="contact-name-input" [value]="contactName" placeholder="Nom du contact" (ionInput)="contactName = $any($event).detail.value || ''"></ion-input>
+      <button class="primary-button" type="button" [disabled]="!isInviteValid" (click)="invitePerson()">Inviter</button>
+    </div>
+  </div>
+</ion-app>
+
+<router-outlet *ngIf="!isEditorRoute"></router-outlet>

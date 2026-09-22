@@ -1,0 +1,56 @@
+<section class="subject-tools" aria-label="Outils de calcul">
+  <ng-container *ngIf="subject === 'maths' || subject === 'physics' || subject === 'chemistry'">
+    <ion-select label="Catégorie" interface="popover" [(ngModel)]="category" (ionChange)="selectCategory()">
+      <ion-select-option *ngFor="let item of categories" [value]="item">{{ item }}</ion-select-option>
+    </ion-select>
+    <ng-container *ngIf="formula">
+      <ion-select label="Formule" interface="popover" [(ngModel)]="formulaId" (ionChange)="selectFormula()">
+        <ion-select-option *ngFor="let item of availableFormulas" [value]="item.id">{{ item.name }}</ion-select-option>
+      </ion-select>
+      <p class="equation">{{ formula.display }}</p>
+      <p *ngIf="formula.note" class="hint">{{ formula.note }}</p>
+      <div class="field-row" *ngFor="let field of formula.inputs">
+        <ion-input [label]="field.label" labelPlacement="stacked" type="text" inputmode="decimal" [(ngModel)]="values[field.id]" (ionInput)="invalidate()"></ion-input>
+        <ion-select *ngIf="field.unit" [attr.aria-label]="'Unité : ' + field.label" interface="popover" [(ngModel)]="selectedUnits[field.id]" (ionChange)="invalidate()">
+          <ion-select-option *ngFor="let unit of units.compatible(field.unit)" [value]="unit.id">{{ unit.id }}</ion-select-option>
+        </ion-select>
+      </div>
+      <ion-select *ngIf="formula.unit" label="Unité du résultat" interface="popover" [(ngModel)]="outputUnit" (ionChange)="invalidate()">
+        <ion-select-option *ngFor="let unit of units.compatible(formula.unit)" [value]="unit.id">{{ unit.id }}</ion-select-option>
+      </ion-select>
+    </ng-container>
+    <ng-container *ngIf="subject === 'chemistry' && category === 'Masse molaire'">
+      <ion-input label="Formule chimique" labelPlacement="stacked" placeholder="H2O, CaCO3, Ca(OH)2" [(ngModel)]="molecule" (ionInput)="invalidate()"></ion-input>
+      <p class="hint">Respectez les majuscules des éléments. Indices et parenthèses acceptés.</p>
+    </ng-container>
+    <ng-container *ngIf="subject === 'chemistry' && category === 'Tableau périodique'">
+      <ion-input label="Rechercher un élément" labelPlacement="stacked" [(ngModel)]="search"></ion-input>
+      <p class="hint">Masses atomiques : PubChem. Pour certains éléments radioactifs, masse d’un isotope représentatif.</p>
+      <div class="elements"><table><thead><tr><th>N°</th><th>Symbole</th><th>Élément</th><th>Masse (u)</th></tr></thead><tbody>
+        <tr *ngFor="let element of elements"><td>{{ element.atomicNumber }}</td><td>{{ element.symbol }}</td><td>{{ element.name }}</td><td>{{ format(element.atomicMass) }}</td></tr>
+      </tbody></table><p *ngIf="!elements.length">Aucun élément trouvé.</p></div>
+    </ng-container>
+  </ng-container>
+  <ng-container *ngIf="subject === 'statistics'">
+    <label for="calculator-dataset">Valeurs</label>
+    <textarea id="calculator-dataset" rows="3" [(ngModel)]="dataset" (ngModelChange)="invalidate()" placeholder="12, 15, 18, 10, 14, 16, 20"></textarea>
+    <p class="hint">Séparez les valeurs par des virgules, espaces ou points-virgules. Décimales : point.</p>
+    <ion-select label="Type de série" interface="popover" [(ngModel)]="sample" (ionChange)="invalidate()">
+      <ion-select-option [value]="false">Population (variance / n)</ion-select-option><ion-select-option [value]="true">Échantillon (variance / n − 1)</ion-select-option>
+    </ion-select>
+  </ng-container>
+  <ng-container *ngIf="subject === 'conversions'">
+    <ion-select label="Cat?gorie" interface="popover" [(ngModel)]="conversionCategory" (ionChange)="selectConversionCategory()">
+      <ion-select-option *ngFor="let item of units.categories" [value]="item">{{ item }}</ion-select-option>
+    </ion-select>
+    <ion-input label="Valeur" labelPlacement="stacked" inputmode="decimal" [(ngModel)]="conversionValue" (ionInput)="invalidate()"></ion-input>
+    <div class="field-row">
+      <ion-select label="De" interface="popover" [(ngModel)]="from" (ionChange)="invalidate()"><ion-select-option *ngFor="let unit of units.forCategory(conversionCategory)" [value]="unit.id">{{ unit.id }}</ion-select-option></ion-select>
+      <ion-select label="Vers" interface="popover" [(ngModel)]="to" (ionChange)="invalidate()"><ion-select-option *ngFor="let unit of units.forCategory(conversionCategory)" [value]="unit.id">{{ unit.id }}</ion-select-option></ion-select>
+    </div>
+    <p class="hint" *ngIf="conversionCategory === 'Données numériques'">KB, MB, GB : base 1 000. KiB, MiB, GiB : base 1 024.</p>
+  </ng-container>
+  <button type="button" *ngIf="category !== 'Tableau p?riodique' || subject !== 'chemistry'" (click)="calculate()">Calculer</button>
+  <p *ngIf="error" class="error" role="alert">{{ error }}</p>
+  <pre *ngIf="resultText" aria-live="polite">{{ resultText }}</pre>
+</section>

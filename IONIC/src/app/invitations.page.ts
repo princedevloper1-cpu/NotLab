@@ -48,12 +48,17 @@ export class InvitationsPage implements OnInit {
     if (this.busyId) return;
     this.busyId = invitation.invitation_id;
     this.backend.respondInvitation(invitation.invitation_id, this.userId, response).subscribe({
-      next: () => {
+      next: (result) => {
+        if (result.status !== 'success') {
+          this.message = result.message || 'La réponse à l’invitation a échoué.';
+          this.busyId = '';
+          return;
+        }
         this.invitations = this.invitations.filter((item) => item.invitation_id !== invitation.invitation_id);
         this.busyId = '';
         if (response === 'accepted') {
-          localStorage.setItem('notlab.activeProjectId', invitation.project_id);
-          localStorage.setItem('notlab.activeProjectTitle', invitation.project_title);
+          localStorage.setItem('notlab.activeProjectId', result.project_id || invitation.project_id);
+          localStorage.setItem('notlab.activeProjectTitle', result.project_title || invitation.project_title);
           void this.router.navigateByUrl('/home', { replaceUrl: true });
         }
       },

@@ -6,6 +6,7 @@
   </header>
 
   <p class="page-message" *ngIf="message">{{ message }}</p>
+  <p class="page-message" *ngIf="busyId">Traitement de votre réponse...</p>
   <p class="empty-state" *ngIf="!isLoading && !invitations.length">Aucune invitation en attente.</p>
 
   <section class="invitation-list" *ngIf="invitations.length">

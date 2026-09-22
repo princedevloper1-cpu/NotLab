@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map, timeout } from 'rxjs';
+import { CalculationEntry } from './calculator/calculator.models';
 
 export interface BackendLabelStyle {
   id: string;
@@ -28,6 +29,8 @@ export interface BackendResponse {
   element_id?: string;
   user_id?: string;
   invitee_user_id?: string;
+  project_id?: string;
+  project_title?: string;
   name?: string;
   phone?: string;
 }
@@ -111,6 +114,28 @@ export class NotlabBackendService {
       user_id: userId,
       pages,
     }));
+  }
+
+  savePageBlock(block: { id: string; pageId: string; projectId: string; authorId: string; type: string; position: number; data: Record<string, unknown>; createdAt: string }): Observable<BackendResponse> {
+    return this.postAction({
+      action: 'save_page_block',
+      block_id: block.id,
+      page_id: block.pageId,
+      project_id: block.projectId,
+      user_id: block.authorId,
+      type: block.type,
+      position: block.position,
+      data: block.data,
+      created_at: block.createdAt,
+    });
+  }
+
+  saveCalculationHistory(entry: CalculationEntry, userId: string, projectId: string): Observable<BackendResponse> {
+    return this.postAction({ action: 'save_calculation_history', user_id: userId, project_id: projectId, entry });
+  }
+
+  saveFormulaAnswer(blockId: string, pageId: string, userId: string, answer: string, validation: 'correct' | 'incorrect'): Observable<BackendResponse> {
+    return this.postAction({ action: 'save_formula_answer', block_id: blockId, page_id: pageId, user_id: userId, answer, validation });
   }
 
   deletePage(pageId: string, userId: string): Observable<BackendResponse> {

@@ -1,9 +1,12 @@
+import { SubjectToolsComponent } from './calculator/subject-tools.component';
+import { CalculationEntry, Subject, SUBJECTS, formatNumber } from './calculator/calculator.models';
+import { FormulaEngine } from './calculator/formula-engine';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, ViewChild } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonPopover, IonToast } from '@ionic/angular';
+import { IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonPopover, IonToast, IonSelect, IonSelectOption } from '@ionic/angular';
 import { BackendPage, NotlabBackendService } from './notlab-backend.service';
 import { addIcons } from 'ionicons';
 import {
@@ -160,11 +163,7 @@ interface TableRow {
   cells: Record<string, string>;
 }
 
-interface CalculatorHistoryItem {
-  expression: string;
-  result: number;
-  createdAt: string;
-}
+type CalculatorHistoryItem = CalculationEntry;
 
 interface NotebookPage {
   pageId: string;
@@ -181,7 +180,7 @@ interface NotebookPage {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonPopover, IonToast, RouterOutlet],
+  imports: [SubjectToolsComponent, IonSelect, IonSelectOption, CommonModule, FormsModule, IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonPopover, IonToast, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -219,9 +218,16 @@ export class App implements AfterViewInit, OnDestroy {
   dynamicTextEditingMode = false;
   showFormulaEditor = false;
   formulaDraft = '';
+  private readonly formulaEngine = new FormulaEngine();
   calculatorResult?: number;
   calculatorError = '';
-  calculatorMode: 'standard' | 'scientific' | 'history' = 'standard';
+  calculatorSubject: Subject = 'maths';
+  readonly calculatorSubjects = SUBJECTS;
+  activeCalculation?: CalculationEntry;
+  restoredCalculation?: CalculationEntry;
+  calculatorCell?: { block: PageBlock; row: TableRow; columnId: string; pageId: string; projectId: string };
+
+  calculatorMode: 'standard' | 'scientific' | 'formulas' | 'history' = 'standard';
   calculatorAngleMode: 'DEG' | 'RAD' = 'DEG';
   showScientificKeys = false;
   calculatorHistory: CalculatorHistoryItem[] = this.loadCalculatorHistory();
@@ -230,6 +236,8 @@ export class App implements AfterViewInit, OnDestroy {
   formulaValidation: Record<string, 'correct' | 'incorrect'> = {};
   dynamicTextPosition = { top: 72, left: 18 };
   dateTimeDraft = '';
+  counterDurationDraft = '5';
+  counterUnit: 'seconds' | 'minutes' | 'hours' | 'days' = 'minutes';
   clockTick = Date.now();
   private dateTimer?: number;
   drawingTool: 'pencil' | 'highlighter' | 'eraser' = 'pencil';
@@ -335,7 +343,7 @@ export class App implements AfterViewInit, OnDestroy {
     { text: 'Séparateur', icon: 'grid-outline', handler: () => this.openSeparatorEditor() },
     { text: 'Calculer', icon: 'calculator-outline', handler: () => this.openFormulaEditor() },
     { text: 'Lien', icon: 'link-outline', handler: () => this.addAttachmentLine('[Lien] ') },
-    { text: 'Date / rappel', icon: 'calendar-outline', handler: () => this.openDynamicDateEditor() },
+    { text: 'Compteur', icon: 'time-outline', handler: () => this.openCounterEditor() },
     { text: 'Étiquette', icon: 'pricetag-outline', handler: () => this.addAttachmentLine('# ') },
     { text: 'Annuler', role: 'cancel' },
   ];
@@ -445,7 +453,14 @@ export class App implements AfterViewInit, OnDestroy {
 
   dateBlockLabel(block: PageBlock): string {
     const target = this.dateBlockTarget(block);
-    return target ? this.formatDynamicDateTime(target) : 'Date / heure';
+    const duration = Number(block.data['duration']);
+    const unit = String(block.data['unit'] || '');
+    if (Number.isFinite(duration) && unit) return `Compteur : ${duration} ${this.counterUnitLabel(unit)}`;
+    return target ? this.formatDynamicDateTime(target) : 'Compteur';
+  }
+
+  private counterUnitLabel(unit: string): string {
+    return unit === 'seconds' ? 'secondes' : unit === 'minutes' ? 'minutes' : unit === 'hours' ? 'heures' : 'jours';
   }
 
   tableColumns(block: PageBlock): TableColumn[] {
@@ -481,6 +496,7 @@ export class App implements AfterViewInit, OnDestroy {
       existing.data['columns'] = count;
       existing.updatedAt = new Date().toISOString();
       this.persistPages();
+      this.savePageBlockToBackend(existing);
       this.showSuccess('Séparateur mis à jour.');
       return;
     }
@@ -513,6 +529,7 @@ export class App implements AfterViewInit, OnDestroy {
     const rows = this.tableRows(block);
     rows.push({ id: `row-${Date.now()}-${rows.length}`, cells: Object.fromEntries(columns.map((column) => [column.id, ''])) });
     this.persistPages();
+    this.savePageBlockToBackend(block);
   }
 
   addTableColumn(block: PageBlock) {
@@ -521,11 +538,13 @@ export class App implements AfterViewInit, OnDestroy {
     columns.push({ id, name: String(columns.length + 1) });
     this.tableRows(block).forEach((row) => row.cells[id] = '');
     this.persistPages();
+    this.savePageBlockToBackend(block);
   }
 
   updateTableCell(block: PageBlock) {
     block.updatedAt = new Date().toISOString();
     this.persistPages();
+    this.savePageBlockToBackend(block);
   }
 
   createDynamicPoll() {
@@ -624,31 +643,33 @@ export class App implements AfterViewInit, OnDestroy {
     this.showSuccess('Mode écriture actif. Cliquez sur la page pour écrire.');
   }
 
-  openDynamicDateEditor() {
+  openCounterEditor() {
     this.showAttachmentActions = false;
     this.showDynamicTextEditor = false;
     this.showFormulaEditor = false;
-    this.dateTimeDraft = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 19);
+    this.counterDurationDraft = '5';
+    this.counterUnit = 'minutes';
     this.showDateTimeEditor = true;
     this.dynamicTextEditingMode = true;
   }
 
-  saveDynamicDateReminder() {
-    const value = this.dateTimeDraft.trim();
-    if (!value) return;
-
-    const selectedDate = new Date(value);
-    if (Number.isNaN(selectedDate.getTime())) {
-      this.showSuccess('La date / heure est invalide. Choisissez une date valide.');
+  saveCounter() {
+    const duration = Number(this.counterDurationDraft.replace(',', '.'));
+    const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000, days: 86400000 };
+    if (!Number.isFinite(duration) || duration <= 0 || duration > 1000000) {
+      this.showSuccess('Saisissez une durée positive et valide.', 'danger');
       return;
     }
 
     this.showDateTimeEditor = false;
+    const targetAt = new Date(Date.now() + duration * multipliers[this.counterUnit]);
     this.addPageBlock('DATE', {
-      content: this.formatDynamicDateTime(selectedDate),
-      targetAt: selectedDate.toISOString(),
+      content: `${duration} ${this.counterUnit}`,
+      targetAt: targetAt.toISOString(),
+      duration,
+      unit: this.counterUnit,
     });
-    this.showSuccess('Le rappel dynamique est maintenant actif.');
+    this.showSuccess('Le compteur dynamique est lancé.');
   }
 
   private formatDynamicDateTime(date: Date): string {
@@ -672,9 +693,14 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   openFormulaEditor() {
+    this.calculatorSubject = 'maths';
+    this.activeCalculation = undefined;
+    this.restoredCalculation = undefined;
+    this.calculatorCell = undefined;
     this.showAttachmentActions = false;
     this.formulaDraft = '';
     this.calculatorResult = undefined;
+    this.activeCalculation = undefined;
     this.calculatorError = '';
     this.calculatorMode = 'standard';
     this.showFormulaEditor = true;
@@ -687,18 +713,21 @@ export class App implements AfterViewInit, OnDestroy {
     if (normalized === '.' && (last === '.' || /\d+\.\d*$/.test(this.formulaDraft))) return;
     this.formulaDraft += normalized;
     this.calculatorResult = undefined;
+    this.activeCalculation = undefined;
     this.calculatorError = '';
   }
 
   clearCalculator() {
     this.formulaDraft = '';
     this.calculatorResult = undefined;
+    this.activeCalculation = undefined;
     this.calculatorError = '';
   }
 
   deleteCalculatorCharacter() {
     this.formulaDraft = this.formulaDraft.slice(0, -1);
     this.calculatorResult = undefined;
+    this.activeCalculation = undefined;
     this.calculatorError = '';
   }
 
@@ -706,6 +735,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (!this.formulaDraft) return;
     this.formulaDraft = this.formulaDraft.startsWith('-') ? this.formulaDraft.slice(1) : `-(${this.formulaDraft})`;
     this.calculatorResult = undefined;
+    this.activeCalculation = undefined;
     this.calculatorError = '';
   }
 
@@ -719,8 +749,9 @@ export class App implements AfterViewInit, OnDestroy {
     this.calculatorClearTimer = undefined;
   }
 
-  setCalculatorMode(mode: 'standard' | 'scientific' | 'history') {
+  setCalculatorMode(mode: 'standard' | 'scientific' | 'formulas' | 'history') {
     this.calculatorMode = mode;
+    if (mode !== 'history') { this.invalidateCalculation(); this.restoredCalculation = undefined; }
   }
 
   toggleScientificKeys() {
@@ -741,6 +772,7 @@ export class App implements AfterViewInit, OnDestroy {
       return;
     }
     if (functionName === '1/x') {
+      this.invalidateCalculation();
       this.formulaDraft = this.formulaDraft ? `1/(${this.formulaDraft})` : '1/(';
       return;
     }
@@ -749,11 +781,13 @@ export class App implements AfterViewInit, OnDestroy {
     if (functionName === 'x!') functionName = 'factorial';
     this.formulaDraft += `${functionName}(`;
     this.calculatorResult = undefined;
+    this.activeCalculation = undefined;
     this.calculatorError = '';
   }
 
   toggleCalculatorAngleMode() {
     this.calculatorAngleMode = this.calculatorAngleMode === 'DEG' ? 'RAD' : 'DEG';
+    this.invalidateCalculation();
   }
 
   calculateDraft() {
@@ -761,6 +795,7 @@ export class App implements AfterViewInit, OnDestroy {
     const result = this.calculateFormula(expression);
     if (result === undefined) {
       this.calculatorResult = undefined;
+    this.activeCalculation = undefined;
       this.calculatorError = 'Expression invalide ou opération impossible';
       return;
     }
@@ -769,57 +804,108 @@ export class App implements AfterViewInit, OnDestroy {
     if (expression) this.addCalculatorHistory(expression, result);
   }
 
-  saveFormula() {
-    const formula = this.formulaDraft.trim();
-    if (!formula || this.calculatorResult === undefined) return;
-    this.showFormulaEditor = false;
-    this.addAttachmentLine(`[Formule] ${formula}`, { expectedResult: this.calculatorResult });
+  changeCalculatorSubject(subject: Subject) {
+    this.calculatorSubject = subject;
+    this.calculatorMode = subject === 'maths' ? 'standard' : 'formulas';
+    this.formulaDraft = '';
+    this.restoredCalculation = undefined;
+    this.invalidateCalculation();
+  }
+
+  invalidateCalculation() {
+    this.activeCalculation = undefined;
     this.calculatorResult = undefined;
+    this.calculatorError = '';
+  }
+
+  subjectLabel(subject: Subject) { return SUBJECTS.find(item => item.id === subject)?.name || 'Mathématiques'; }
+
+  receiveCalculation(entry: CalculationEntry) {
+    this.activeCalculation = entry;
+    this.formulaDraft = entry.expression;
+    this.calculatorResult = entry.result;
+    this.calculatorError = '';
+    this.calculatorHistory = [entry, ...this.calculatorHistory].slice(0, 100);
+    localStorage.setItem('notlab.calculator.history', JSON.stringify(this.calculatorHistory));
+    this.backend.saveCalculationHistory(entry, this.currentUserId, this.currentProjectId).subscribe({ error: () => undefined });
+  }
+
+  openCellCalculator(block: PageBlock, row: TableRow, columnId: string, event: Event) {
+    event.stopPropagation();
+    this.openFormulaEditor();
+    this.calculatorCell = { block, row, columnId, pageId: this.currentPage!.pageId, projectId: this.currentProjectId };
+    this.formulaDraft = row.cells[columnId] || '';
+  }
+
+  useCalculationInCell() {
+    const target = this.calculatorCell;
+    if (!target || this.calculatorResult === undefined) return;
+    if (target.projectId !== this.currentProjectId || target.pageId !== this.currentPage?.pageId || !this.currentPage?.blocks?.some(block => block.id === target.block.id)) {
+      this.calculatorError = 'La cellule cible n?est plus disponible.';
+      return;
+    }
+    target.row.cells[target.columnId] = String(this.calculatorResult);
+    this.updateTableCell(target.block);
+    this.showFormulaEditor = false;
+    this.calculatorCell = undefined;
+  }
+
+  saveFormula() {
+    if (!this.activeCalculation) return;
+    this.insertCalculatorHistory(this.activeCalculation);
   }
 
   formattedCalculatorResult(): string {
-    return this.calculatorResult === undefined ? '' : this.formatCalculatorNumber(this.calculatorResult);
+    return this.calculatorResult === undefined ? '' : `${formatNumber(this.calculatorResult)} ${this.activeCalculation?.unit || ''}`.trim();
   }
 
-  formatCalculatorNumber(value: number): string {
-    return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 10 }).format(value);
-  }
+  formatCalculatorNumber(value: number): string { return formatNumber(value); }
 
   private addCalculatorHistory(expression: string, result: number) {
-    this.calculatorHistory = [
-      { expression, result, createdAt: new Date().toISOString() },
-      ...this.calculatorHistory.filter((item) => item.expression !== expression),
-    ].slice(0, 30);
-    localStorage.setItem('notlab.calculator.history', JSON.stringify(this.calculatorHistory));
+    this.receiveCalculation({ id: crypto.randomUUID(), subject: 'maths', expression, result,
+      inputs: {}, unit: '', createdAt: new Date().toISOString(), angleMode: this.calculatorAngleMode,
+      text: `${expression} = ${formatNumber(result)}` });
   }
 
   private loadCalculatorHistory(): CalculatorHistoryItem[] {
     try {
       const saved = JSON.parse(localStorage.getItem('notlab.calculator.history') || '[]');
-      return Array.isArray(saved) ? saved.filter((item): item is CalculatorHistoryItem => typeof item?.expression === 'string' && Number.isFinite(item?.result)).slice(0, 30) : [];
-    } catch {
-      return [];
-    }
+      if (!Array.isArray(saved)) return [];
+      return saved.filter(item => typeof item?.expression === 'string' && Number.isFinite(item?.result)).slice(0, 100).map(item => ({
+        ...item, id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
+        subject: SUBJECTS.some(subject => subject.id === item.subject) ? item.subject : 'maths',
+        inputs: item.inputs && typeof item.inputs === 'object' ? item.inputs : {}, unit: typeof item.unit === 'string' ? item.unit : '',
+      }));
+    } catch { return []; }
   }
 
   reuseCalculatorHistory(item: CalculatorHistoryItem) {
-    this.calculatorMode = 'standard';
+    this.calculatorSubject = item.subject;
+    this.calculatorMode = item.subject === 'maths' && !item.tool ? 'standard' : 'formulas';
+    this.calculatorAngleMode = item.angleMode || 'DEG';
+    this.restoredCalculation = item;
+    this.activeCalculation = item;
     this.formulaDraft = item.expression;
     this.calculatorResult = item.result;
     this.calculatorError = '';
   }
 
   copyCalculatorResult(item: CalculatorHistoryItem) {
-    void navigator.clipboard?.writeText(String(item.result));
+    void navigator.clipboard?.writeText(item.text || `${item.expression} = ${formatNumber(item.result)} ${item.unit}`)
+      .catch(() => this.showSuccess('Copie impossible dans ce navigateur.', 'danger'));
   }
 
   insertCalculatorHistory(item: CalculatorHistoryItem) {
     this.showFormulaEditor = false;
-    this.addAttachmentLine(`[Formule] ${item.expression}`, { expectedResult: item.result });
+    if (item.subject === 'maths' && !item.tool) {
+      this.addAttachmentLine(`[Formule] ${item.expression}`, { expectedResult: item.result });
+    } else {
+      this.addAttachmentLine(item.text || `${item.expression} = ${formatNumber(item.result)} ${item.unit}`);
+    }
   }
 
   deleteCalculatorHistory(item: CalculatorHistoryItem) {
-    this.calculatorHistory = this.calculatorHistory.filter((entry) => entry !== item);
+    this.calculatorHistory = this.calculatorHistory.filter(entry => entry.id !== item.id);
     localStorage.setItem('notlab.calculator.history', JSON.stringify(this.calculatorHistory));
   }
 
@@ -858,6 +944,7 @@ export class App implements AfterViewInit, OnDestroy {
     const value = (this.formulaResultDraft[block.id] || '').trim();
     if (!value) {
       this.formulaValidation[block.id] = 'incorrect';
+      this.saveFormulaAnswerToBackend(block, value, 'incorrect');
       return;
     }
     const storedExpected = Number(block.data['expectedResult']);
@@ -865,10 +952,12 @@ export class App implements AfterViewInit, OnDestroy {
     const answer = Number(value.replace(',', '.'));
     if (expected === undefined || !Number.isFinite(answer)) {
       this.formulaValidation[block.id] = 'incorrect';
+      this.saveFormulaAnswerToBackend(block, value, 'incorrect');
       return;
     }
 
     this.formulaValidation[block.id] = Math.abs(answer - expected) < 0.000001 ? 'correct' : 'incorrect';
+    this.saveFormulaAnswerToBackend(block, value, this.formulaValidation[block.id]);
   }
 
   formulaValidationMessage(block: PageBlock): string {
@@ -879,80 +968,7 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   private calculateFormula(expression: string): number | undefined {
-    const normalized = expression.replace(/,/g, '.').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/\s+/g, '').replace(/π/g, 'pi');
-    let index = 0;
-    const parseExpression = (): number | undefined => {
-      let value = parseTerm();
-      while (value !== undefined && (normalized[index] === '+' || normalized[index] === '-')) {
-        const operator = normalized[index++];
-        const right = parseTerm();
-        if (right === undefined) return undefined;
-        value = operator === '+' ? value + right : value - right;
-      }
-      return value;
-    };
-    const parseTerm = (): number | undefined => {
-      let value = parsePower();
-      while (value !== undefined && (normalized[index] === '*' || normalized[index] === '/' || normalized[index] === '%')) {
-        const operator = normalized[index++];
-        const right = parsePower();
-        if (right === undefined || (operator === '/' && right === 0)) return undefined;
-        value = operator === '*' ? value * right : operator === '/' ? value / right : value % right;
-      }
-      return value;
-    };
-    const parsePower = (): number | undefined => {
-      let value = parseUnary();
-      if (value !== undefined && normalized[index] === '^') {
-        index++;
-        const exponent = parsePower();
-        if (exponent === undefined) return undefined;
-        value = Math.pow(value, exponent);
-      }
-      return value;
-    };
-    const parseUnary = (): number | undefined => {
-      if (normalized[index] === '+') { index++; return parseUnary(); }
-      if (normalized[index] === '-') { index++; const value = parseUnary(); return value === undefined ? undefined : -value; }
-      return parsePrimary();
-    };
-    const parsePrimary = (): number | undefined => {
-      if (normalized[index] === '(') {
-        index++;
-        const value = parseExpression();
-        if (normalized[index++] !== ')') return undefined;
-        return value;
-      }
-      const functionMatch = normalized.slice(index).match(/^(sin|cos|tan|log|ln|sqrt|abs|factorial)/);
-      if (functionMatch) {
-        index += functionMatch[0].length;
-        if (normalized[index++] !== '(') return undefined;
-        const argument = parseExpression();
-        if (normalized[index++] !== ')' || argument === undefined) return undefined;
-        return this.applyCalculatorFunction(functionMatch[0], argument);
-      }
-      if (normalized.slice(index, index + 2) === 'pi') { index += 2; return Math.PI; }
-      if (normalized[index] === 'e') { index++; return Math.E; }
-      const number = normalized.slice(index).match(/^\d+(?:\.\d+)?/);
-      if (!number) return undefined;
-      index += number[0].length;
-      return Number(number[0]);
-    };
-    const result = parseExpression();
-    return result !== undefined && index === normalized.length && Number.isFinite(result) && Math.abs(result) <= Number.MAX_SAFE_INTEGER ? Number(result.toFixed(10)) : undefined;
-  }
-
-  private applyCalculatorFunction(name: string, value: number): number | undefined {
-    if (name === 'sin' || name === 'cos' || name === 'tan') {
-      const angle = this.calculatorAngleMode === 'DEG' ? value * Math.PI / 180 : value;
-      return name === 'sin' ? Math.sin(angle) : name === 'cos' ? Math.cos(angle) : Math.tan(angle);
-    }
-    if (name === 'log') return value > 0 ? Math.log10(value) : undefined;
-    if (name === 'ln') return value > 0 ? Math.log(value) : undefined;
-    if (name === 'sqrt') return value >= 0 ? Math.sqrt(value) : undefined;
-    if (name === 'abs') return Math.abs(value);
-    if (name === 'factorial') return value >= 0 && Number.isInteger(value) && value <= 170 ? Array.from({ length: value }, (_, i) => i + 1).reduce((total, current) => total * current, 1) : undefined;
-    return undefined;
+    return this.formulaEngine.evaluate(expression, this.calculatorAngleMode);
   }
 
   startDynamicTextAt(event: MouseEvent) {
@@ -2124,6 +2140,24 @@ export class App implements AfterViewInit, OnDestroy {
     };
     page.blocks = [...(page.blocks || []), block];
     this.persistPages();
+    this.savePageBlockToBackend(block);
+  }
+
+  private savePageBlockToBackend(block: PageBlock) {
+    this.backend.savePageBlock({
+      id: block.id,
+      pageId: block.pageId,
+      projectId: this.currentProjectId,
+      authorId: block.authorId,
+      type: block.type,
+      position: block.position,
+      data: block.data,
+      createdAt: block.createdAt,
+    }).subscribe({ error: () => undefined });
+  }
+
+  private saveFormulaAnswerToBackend(block: PageBlock, answer: string, validation: 'correct' | 'incorrect') {
+    this.backend.saveFormulaAnswer(block.id, block.pageId, this.currentUserId, answer, validation).subscribe({ error: () => undefined });
   }
 
   async toggleVoiceRecording() {

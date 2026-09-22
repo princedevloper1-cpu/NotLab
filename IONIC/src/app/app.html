@@ -55,18 +55,26 @@
         <span *ngFor="let index of separatorIndexes(separator)" class="page-separator" [style.left.%]="separatorPosition(separator, index)"></span>
       </div>
       <div *ngIf="showDynamicTextEditor" [style.position]="'absolute'" [style.z-index]="6" [style.top.px]="dynamicTextPosition.top" [style.left.px]="dynamicTextPosition.left" [style.width.px]="220" [style.display]="'flex'" [style.gap.px]="6" [style.padding.px]="6" [style.border-radius.px]="10" [style.background]="'rgba(255,255,255,.94)'">
-        <input type="text" [(ngModel)]="draftText" placeholder="Écrivez sur la page..." (keyup.enter)="sendDynamicText()" aria-label="Éditeur dynamique" autofocus [style.min-width]="'0'" [style.flex]="'1'" [style.border]="'0'" [style.outline]="'0'" [style.background]="'transparent'" [style.color]="'#173b7a'" [style.font]="'18px Caveat,cursive'">
+        <input type="text" [(ngModel)]="draftText" placeholder="Écrivez sur la page..." (keyup.enter)="sendDynamicText()" aria-label="Éditeur dynamique" autofocus [style.min-width]="'0'" [style.flex]="'1'" [style.border]="'0'" [style.outline]="'0'" [style.background]="'transparent'" [style.color]="typography.color" [style.font-family]="fontFamilyFor(typography.font)" [style.font-size.px]="typography.size" [style.font-weight]="typography.bold ? 700 : 400" [style.font-style]="typography.italic ? 'italic' : 'normal'">
         <button type="button" aria-label="Ajouter le contenu" (click)="sendDynamicText()" [style.border]="'0'" [style.border-radius.px]="8" [style.background]="'#1677f2'" [style.color]="'white'" [style.padding]="'6px 9px'"><ion-icon name="send-outline"></ion-icon></button>
       </div>
       <div *ngIf="showDateTimeEditor" [style.position]="'absolute'" [style.z-index]="6" [style.top.px]="72" [style.left.px]="18" [style.right.px]="18" [style.padding.px]="12" [style.border-radius.px]="12" [style.background]="'rgba(255,255,255,.97)'" [style.box-shadow]="'0 12px 28px rgba(15,23,42,.16)'">
         <div [style.display]="'flex'" [style.flex-direction]="'column'" [style.gap.px]="10">
           <label [style.display]="'flex'" [style.flex-direction]="'column'" [style.gap.px]="4" [style.font-size.px]="12" [style.color]="'#173b7a'">
-            <span>Date et heure</span>
-            <input type="datetime-local" step="1" [(ngModel)]="dateTimeDraft" aria-label="Choisir la date et l’heure" [style.border]="'1px solid rgba(23,59,122,.25)'" [style.border-radius.px]="8" [style.padding]="'8px 10px'" [style.color]="'#173b7a'">
+            <span>Durée du compteur</span>
+            <div [style.display]="'flex'" [style.gap.px]="6">
+              <input type="number" min="0.1" step="0.1" [(ngModel)]="counterDurationDraft" aria-label="Durée du compteur" [style.min-width]="'0'" [style.flex]="'1'" [style.border]="'1px solid rgba(23,59,122,.25)'" [style.border-radius.px]="8" [style.padding]="'8px 10px'" [style.color]="'#173b7a'">
+              <select [(ngModel)]="counterUnit" aria-label="Unité de durée" [style.border]="'1px solid rgba(23,59,122,.25)'" [style.border-radius.px]="8" [style.padding]="'8px 6px'" [style.color]="'#173b7a'">
+                <option value="seconds">Secondes</option>
+                <option value="minutes">Minutes</option>
+                <option value="hours">Heures</option>
+                <option value="days">Jours</option>
+              </select>
+            </div>
           </label>
           <div [style.display]="'flex'" [style.justify-content]="'flex-end'" [style.gap.px]="8">
             <button type="button" (click)="showDateTimeEditor = false" [style.border]="'0'" [style.border-radius.px]="8" [style.background]="'rgba(23,59,122,.08)'" [style.color]="'#173b7a'" [style.padding]="'8px 12px'">Annuler</button>
-            <button type="button" (click)="saveDynamicDateReminder()" [style.border]="'0'" [style.border-radius.px]="8" [style.background]="'#1677f2'" [style.color]="'white'" [style.padding]="'8px 12px'">Ajouter</button>
+            <button type="button" (click)="saveCounter()" [style.border]="'0'" [style.border-radius.px]="8" [style.background]="'#1677f2'" [style.color]="'white'" [style.padding]="'8px 12px'">Démarrer</button>
           </div>
         </div>
       </div>
@@ -88,9 +96,13 @@
           </div>
           <button type="button" class="calculator-close" aria-label="Fermer la calculatrice" (click)="showFormulaEditor = false"><ion-icon name="close-outline"></ion-icon></button>
         </header>
+        <ion-select class="calculator-subject-select" label="Matière" interface="popover" [(ngModel)]="calculatorSubject" (ionChange)="changeCalculatorSubject($any($event).detail.value)">
+          <ion-select-option *ngFor="let subject of calculatorSubjects" [value]="subject.id">{{ subject.name }}</ion-select-option>
+        </ion-select>
         <div class="calculator-modes" role="tablist" aria-label="Mode de calcul">
-          <button type="button" [class.active]="calculatorMode === 'standard'" (click)="setCalculatorMode('standard')">Standard</button>
-          <button type="button" [class.active]="calculatorMode === 'scientific'" (click)="setCalculatorMode('scientific')">Scientifique</button>
+          <button *ngIf="calculatorSubject === 'maths'" type="button" [class.active]="calculatorMode === 'standard'" (click)="setCalculatorMode('standard')">Standard</button>
+          <button *ngIf="calculatorSubject === 'maths'" type="button" [class.active]="calculatorMode === 'scientific'" (click)="setCalculatorMode('scientific')">Scientifique</button>
+          <button type="button" [class.active]="calculatorMode === 'formulas'" (click)="setCalculatorMode('formulas')">Formules</button>
           <button type="button" [class.active]="calculatorMode === 'history'" (click)="setCalculatorMode('history')"><ion-icon name="time-outline"></ion-icon> Historique</button>
         </div>
         <div *ngIf="calculatorMode === 'history'" class="calculator-history">
@@ -104,15 +116,22 @@
           </article>
         </div>
         <ng-container *ngIf="calculatorMode !== 'history'">
-          <div *ngIf="calculatorMode === 'scientific'" class="calculator-scientific-toggle">
+          <app-subject-tools
+            *ngIf="calculatorMode === 'formulas' || calculatorSubject !== 'maths'"
+            [subject]="calculatorSubject"
+            [restored]="restoredCalculation"
+            (calculated)="receiveCalculation($event)"
+            (invalidated)="invalidateCalculation()"
+          ></app-subject-tools>
+          <div *ngIf="calculatorSubject === 'maths' && calculatorMode === 'scientific'" class="calculator-scientific-toggle">
             <button type="button" (click)="toggleScientificKeys()">{{ showScientificKeys ? 'Masquer' : 'Afficher' }} les fonctions scientifiques</button>
             <button type="button" class="angle-toggle" (click)="toggleCalculatorAngleMode()">{{ calculatorAngleMode }}</button>
           </div>
-          <div *ngIf="calculatorMode === 'scientific' && showScientificKeys" class="calculator-scientific-grid">
+          <div *ngIf="calculatorSubject === 'maths' && calculatorMode === 'scientific' && showScientificKeys" class="calculator-scientific-grid">
             <button type="button" *ngFor="let key of ['sin', 'cos', 'tan', 'log', 'ln', '√', 'x²', 'xʸ', '1/x', '|x|', 'π', 'e', 'x!']" (click)="addScientificFunction(key)">{{ key }}</button>
             <button type="button" (click)="addFormulaToken('(')">(</button><button type="button" (click)="addFormulaToken(')')">)</button>
           </div>
-          <div class="calculator-keypad">
+          <div *ngIf="calculatorSubject === 'maths' && (calculatorMode === 'standard' || calculatorMode === 'scientific')" class="calculator-keypad">
             <button type="button" class="calculator-action" (pointerdown)="startCalculatorClear()" (pointerup)="cancelCalculatorClear()" (pointerleave)="cancelCalculatorClear()" (pointercancel)="cancelCalculatorClear()">C</button>
             <button type="button" (click)="toggleCalculatorSign()">±</button>
             <button type="button" (click)="addFormulaToken('%')">%</button>
@@ -123,7 +142,7 @@
             <button type="button" class="calculator-zero" (click)="addFormulaToken('0')">0</button><button type="button" (click)="addFormulaToken('.')">.</button>
             <button type="button" (click)="addFormulaToken('(')">(</button><button type="button" (click)="addFormulaToken(')')">)</button><button type="button" aria-label="Supprimer le dernier caractère" title="Retour arrière" (click)="deleteCalculatorCharacter()"><ion-icon name="backspace-outline"></ion-icon></button><button type="button" class="calculator-equals" (click)="calculateDraft()">=</button>
           </div>
-          <button type="button" class="calculator-insert" [disabled]="calculatorResult === undefined" (click)="saveFormula()">Insérer dans la note</button>
+          <button type="button" class="calculator-insert" [disabled]="!activeCalculation" (click)="saveFormula()">Insérer dans la note</button>
         </ng-container>
       </section>
       <canvas #drawingCanvas class="drawing-canvas" [class.drawing-active]="isDrawingMode" (pointerdown)="startDrawing($event)" (pointermove)="draw($event)" (pointerup)="stopDrawing()" (pointercancel)="stopDrawing()"></canvas>
@@ -171,7 +190,7 @@
         <div *ngIf="currentFormulaBlocks.length" class="formula-exercises-grid" [style.--formula-column-count]="currentSeparatorCount || 1">
           <div *ngFor="let column of [].constructor(currentSeparatorCount || 1); let columnIndex = index" class="formula-column">
             <ng-container *ngFor="let formula of formulaBlocksForColumn(columnIndex, currentSeparatorCount || 1)">
-              <div class="formula-notebook-row" (click)="$event.stopPropagation()">
+              <div class="formula-notebook-row" (click)="$event.stopPropagation()" [style.font-family]="fontFamilyFor(typography.font)" [style.font-size.px]="typography.size" [style.font-weight]="typography.bold ? 700 : 400" [style.font-style]="typography.italic ? 'italic' : 'normal'" [style.text-decoration]="(typography.underline ? 'underline ' : '') + (typography.strike ? 'line-through' : '')" [style.color]="typography.color">
                 <div class="formula-equation"><span class="formula-expression">{{ formulaExpression(formula) }}</span><span class="formula-equals">=</span></div>
                 <div class="formula-answer-line">
                   <input

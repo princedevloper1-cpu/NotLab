@@ -1,24 +1,24 @@
 <main class="invitations-shell">
   <header class="invitations-header">
-    <button type="button" aria-label="Retounen" (click)="goBack()">‹</button>
-    <h1>Envitasyon</h1>
+    <button type="button" aria-label="Retour" (click)="goBack()">‹</button>
+    <h1>Invitations</h1>
     <span></span>
   </header>
 
   <p class="page-message" *ngIf="message">{{ message }}</p>
-  <p class="empty-state" *ngIf="!isLoading && !invitations.length">Pa gen okenn envitasyon ann atann.</p>
+  <p class="empty-state" *ngIf="!isLoading && !invitations.length">Aucune invitation en attente.</p>
 
   <section class="invitation-list" *ngIf="invitations.length">
     <article class="invitation-card" *ngFor="let invitation of invitations">
       <div class="invitation-icon">N</div>
       <div class="invitation-copy">
-        <strong>{{ invitation.inviter_name }} envite ou</strong>
+        <strong>{{ invitation.inviter_name }} vous invite</strong>
         <span>{{ invitation.project_title }}</span>
-        <small>Travay ansanm sou pwojè sa a ak ekip ou.</small>
+        <small>Travaillez ensemble sur ce projet avec votre équipe.</small>
       </div>
       <div class="invitation-actions">
-        <button class="decline" type="button" [disabled]="busyId === invitation.invitation_id" (click)="respond(invitation, 'declined')">Refize</button>
-        <button class="accept" type="button" [disabled]="busyId === invitation.invitation_id" (click)="respond(invitation, 'accepted')">Aksepte</button>
+        <button class="decline" type="button" [disabled]="busyId === invitation.invitation_id" (click)="respond(invitation, 'declined')">Refuser</button>
+        <button class="accept" type="button" [disabled]="busyId === invitation.invitation_id" (click)="respond(invitation, 'accepted')">Accepter</button>
       </div>
     </article>
   </section>

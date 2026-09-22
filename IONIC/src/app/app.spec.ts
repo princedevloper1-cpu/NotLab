@@ -25,7 +25,7 @@ describe('OnboardingPage', () => {
     const fixture = TestBed.createComponent(OnboardingPage);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Kreye yon kont');
-    expect(compiled.textContent).toContain('Konekte');
+    expect(compiled.textContent).toContain('Créer un compte');
+    expect(compiled.textContent).toContain('Se connecter');
   });
 });

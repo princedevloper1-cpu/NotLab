@@ -1,12 +1,12 @@
 <ion-app *ngIf="isEditorRoute">
   <main class="editor-shell">
     <header class="editor-header">
-      <button class="icon-button" type="button" aria-label="Retounen nan nòt yo" (click)="goHome()"><ion-icon name="arrow-back-outline"></ion-icon></button>
+      <button class="icon-button" type="button" aria-label="Retour aux notes" (click)="goHome()"><ion-icon name="arrow-back-outline"></ion-icon></button>
       <button class="icon-button" type="button" aria-label="Page précédente" [disabled]="!canGoPrevious" (click)="previousPage()"><ion-icon name="chevron-back-outline"></ion-icon></button>
       <button class="page-button" type="button" (click)="openPageManager()">{{ totalPages ? pageNumber + ' / ' + totalPages : 'Aucune page' }}</button>
       <button class="icon-button" type="button" aria-label="Page suivante" [disabled]="!canGoNext" (click)="nextPage()"><ion-icon name="chevron-forward-outline"></ion-icon></button>
-      <button class="icon-button collaboration-button" type="button" aria-label="Pataje ak kolaborasyon" (click)="openCollabSheet()"><ion-icon [name]="collaborationIconName"></ion-icon><span class="collaboration-badge" *ngIf="pendingInvitationCount">{{ pendingInvitationCount }}</span></button>
-      <button class="icon-button" type="button" aria-label="Opsyon pwojè a" (click)="showProjectOptions = !showProjectOptions"><ion-icon name="ellipsis-vertical-outline"></ion-icon></button>
+      <button class="icon-button collaboration-button" type="button" aria-label="Partage et collaboration" (click)="openCollabSheet()"><ion-icon [name]="collaborationIconName"></ion-icon><span class="collaboration-badge" *ngIf="pendingInvitationCount">{{ pendingInvitationCount }}</span></button>
+      <button class="icon-button" type="button" aria-label="Options du projet" (click)="showProjectOptions = !showProjectOptions"><ion-icon name="ellipsis-vertical-outline"></ion-icon></button>
     </header>
 
     <section class="notebook-paper" [class.draft-paper]="currentPage?.paperType === 'draft'" aria-label="Page du notebook" (pointerdown)="handleEditorPointerDown($event)" (pointerup)="handleEditorPointerUp($event)" (pointercancel)="handleEditorPointerUp($event)">
@@ -39,10 +39,10 @@
             ><span [style.background]="color" [style.display]="'block'" [style.width.px]="18" [style.height.px]="18" [style.border-radius.px]="9"></span></button>
           </div>
           <label [style.display]="'flex'" [style.align-items]="'center'" [style.justify-content]="'space-between'" [style.gap.px]="8">
-            <span>Pèsonalize</span>
+            <span>Personnalisé</span>
             <input type="color" [value]="drawingColor" aria-label="Choisir une couleur personnalisée" (input)="setDrawingColor($any($event.target).value)">
           </label>
-          <label>Gwosè <input type="range" min="1" max="24" [value]="drawingSize" (input)="setDrawingSize(+$any($event.target).value)"><output>{{ drawingSize }}px</output></label>
+          <label>Taille <input type="range" min="1" max="24" [value]="drawingSize" (input)="setDrawingSize(+$any($event.target).value)"><output>{{ drawingSize }}px</output></label>
         </div>
       </div>
       <div *ngIf="isDynamicMode" aria-label="Barre du mode dynamique" [style.position]="'fixed'" [style.z-index]="8" [style.right.%]="50" [style.bottom.px]="12" [style.display]="'flex'" [style.gap.px]="4" [style.padding.px]="5" [style.border-radius.px]="14" [style.background]="'#09121d'" [style.transform]="'translateX(50%)'">
@@ -128,55 +128,66 @@
       </section>
       <canvas #drawingCanvas class="drawing-canvas" [class.drawing-active]="isDrawingMode" (pointerdown)="startDrawing($event)" (pointermove)="draw($event)" (pointerup)="stopDrawing()" (pointercancel)="stopDrawing()"></canvas>
       <div class="paper-lines" [class.draft-lines]="currentPage?.paperType === 'draft'" (click)="startDynamicTextAt($event)">
-        <div class="notebook-row" *ngFor="let line of lines">
-          <div class="author-marker-slot">
-            <button
-              *ngIf="line.text.trim() && authorForLine(line) as author"
-              class="author-marker"
-              [class.current-user]="author.isCurrentUser"
-              type="button"
-              [style.background]="author.color"
-              [attr.aria-label]="'Afficher ' + author.name"
-              (pointerdown)="$event.stopPropagation()"
-              (click)="openAuthorPopover(line, $event)"
-            >
-              <img *ngIf="author.avatarUrl" [src]="author.avatarUrl" [alt]="author.name">
-              <span *ngIf="!author.avatarUrl">{{ author.initials }}</span>
-            </button>
-          </div>
-          <div
-            class="notebook-line"
-            [class.selected]="selectedLine?.id === line.id"
-            [style.font-family]="fontFamilyFor(line.font)"
-            [style.font-size.px]="line.size"
-            [style.font-weight]="line.bold ? 700 : 400"
-            [style.font-style]="line.italic ? 'italic' : 'normal'"
-            [style.text-decoration]="(line.underline ? 'underline ' : '') + (line.strike ? 'line-through' : '')"
-            [style.color]="line.color"
-            [style.text-align]="line.align"
-            (click)="editDynamicLine(line, $event)"
-            (pointerdown)="startLinePress(line, $event)"
-            (pointerup)="cancelLinePress()"
-            (pointercancel)="cancelLinePress()"
-            (pointerleave)="cancelLinePress()"
-            (contextmenu)="$event.preventDefault(); selectLine(line, $any($event.currentTarget).getBoundingClientRect())"
-          >
-            <span class="line-copy" [class.has-label]="!!line.labelStyle" [style.background]="asLabelBackground(line.labelStyle)">{{ line.text }}</span>
+        <div class="notebook-text-columns" [style.--text-column-count]="currentSeparatorCount || 1">
+          <div *ngFor="let column of [].constructor(currentSeparatorCount || 1); let columnIndex = index" class="notebook-text-column">
+            <div class="notebook-row" *ngFor="let line of linesForColumn(columnIndex, currentSeparatorCount || 1)">
+              <div class="author-marker-slot">
+                <button
+                  *ngIf="line.text.trim() && authorForLine(line) as author"
+                  class="author-marker"
+                  [class.current-user]="author.isCurrentUser"
+                  type="button"
+                  [style.background]="author.color"
+                  [attr.aria-label]="'Afficher ' + author.name"
+                  (pointerdown)="$event.stopPropagation()"
+                  (click)="openAuthorPopover(line, $event)"
+                >
+                  <img *ngIf="author.avatarUrl" [src]="author.avatarUrl" [alt]="author.name">
+                  <span *ngIf="!author.avatarUrl">{{ author.initials }}</span>
+                </button>
+              </div>
+              <div
+                class="notebook-line"
+                [class.selected]="selectedLine?.id === line.id"
+                [style.font-family]="fontFamilyFor(line.font)"
+                [style.font-size.px]="line.size"
+                [style.font-weight]="line.bold ? 700 : 400"
+                [style.font-style]="line.italic ? 'italic' : 'normal'"
+                [style.text-decoration]="(line.underline ? 'underline ' : '') + (line.strike ? 'line-through' : '')"
+                [style.color]="line.color"
+                [style.text-align]="line.align"
+                (click)="editDynamicLine(line, $event)"
+                (pointerdown)="startLinePress(line, $event)"
+                (pointerup)="cancelLinePress()"
+                (pointercancel)="cancelLinePress()"
+                (pointerleave)="cancelLinePress()"
+                (contextmenu)="$event.preventDefault(); selectLine(line, $any($event.currentTarget).getBoundingClientRect())"
+              >
+                <span class="line-copy" [class.has-label]="!!line.labelStyle" [style.background]="asLabelBackground(line.labelStyle)">{{ line.text }}</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div *ngFor="let formula of currentFormulaBlocks" class="formula-notebook-row" (click)="$event.stopPropagation()">
-          <span class="formula-expression">{{ formulaExpression(formula) }}</span>
-          <span class="formula-equals">=</span>
-          <input
-            [(ngModel)]="formulaResultDraft[formula.id]"
-            class="formula-answer-input"
-            placeholder="Réponse"
-            aria-label="Réponse à l’exercice"
-            (keyup.enter)="addFormulaResult(formula)"
-            (click)="$event.stopPropagation()"
-          >
-          <button type="button" class="formula-validate-button" (click)="addFormulaResult(formula)">Valider</button>
-          <small *ngIf="formulaValidationMessage(formula)" class="formula-validation" [class.correct]="formulaValidation[formula.id] === 'correct'">{{ formulaValidationMessage(formula) }}</small>
+        <div *ngIf="currentFormulaBlocks.length" class="formula-exercises-grid" [style.--formula-column-count]="currentSeparatorCount || 1">
+          <div *ngFor="let column of [].constructor(currentSeparatorCount || 1); let columnIndex = index" class="formula-column">
+            <ng-container *ngFor="let formula of formulaBlocksForColumn(columnIndex, currentSeparatorCount || 1)">
+              <div class="formula-notebook-row" (click)="$event.stopPropagation()">
+                <div class="formula-equation"><span class="formula-expression">{{ formulaExpression(formula) }}</span><span class="formula-equals">=</span></div>
+                <div class="formula-answer-line">
+                  <input
+                    [(ngModel)]="formulaResultDraft[formula.id]"
+                    class="formula-answer-input"
+                    placeholder="Réponse"
+                    aria-label="Réponse à l’exercice"
+                    (keyup.enter)="addFormulaResult(formula)"
+                    (click)="$event.stopPropagation()"
+                  >
+                  <button type="button" class="formula-validate-button" (click)="addFormulaResult(formula)">Valider</button>
+                </div>
+                <small *ngIf="formulaValidationMessage(formula)" class="formula-validation" [class.correct]="formulaValidation[formula.id] === 'correct'">{{ formulaValidationMessage(formula) }}</small>
+              </div>
+            </ng-container>
+          </div>
         </div>
       </div>
       <div *ngIf="currentTableBlocks.length" [style.position]="'relative'" [style.z-index]="3" [style.padding]="'8px 18px 90px'">
@@ -200,7 +211,7 @@
 
     <div class="composer-wrap" *ngIf="!isDynamicMode">
       <div class="typography-popover" *ngIf="showTypography">
-        <div class="popover-title">Tipografi</div>
+        <div class="popover-title">Typographie</div>
         <div class="font-options">
           <button type="button" *ngFor="let font of ['Handwriting 1', 'Handwriting 2', 'Handwriting 3', 'Roboto', 'Poppins', 'Montserrat']" [class.active]="typography.font === font" (click)="updateTypography('font', font)">{{ font }}</button>
         </div>
@@ -236,13 +247,13 @@
           </ng-template>
           <ng-template #recentList>
             <button type="button" *ngFor="let recent of recentStickers" (click)="chooseEmoji(recent)">{{ recent }}</button>
-            <span *ngIf="!recentStickers.length" class="empty-stickers">Pa gen dènye</span>
+            <span *ngIf="!recentStickers.length" class="empty-stickers">Aucun élément récent</span>
           </ng-template>
         </div>
       </div>
 
       <div class="writing-bar">
-        <button class="type-button" type="button" aria-label="Opsyon tipografi" (click)="showTypography = !showTypography">A</button>
+        <button class="type-button" type="button" aria-label="Options de typographie" (click)="showTypography = !showTypography">A</button>
         <ion-input #composerInput class="composer-input" [value]="draftText" [placeholder]="editingLineId ? 'Modifier la ligne...' : 'Écrire une ligne dans le cahier...'" (ionInput)="onDraftInput($any($event).detail.value || '')" (keyup.enter)="sendLine()"></ion-input>
         <button class="composer-icon" type="button" aria-label="Emoji" (click)="showEmojiPicker = !showEmojiPicker"><ion-icon name="happy-outline"></ion-icon></button>
         <button class="composer-icon" type="button" aria-label="Pièce jointe" (click)="showAttachmentActions = true"><ion-icon name="attach-outline"></ion-icon></button>
@@ -251,19 +262,19 @@
     </div>
 
     <div class="line-menu" *ngIf="selectedLine && showLineMenu && !showLineMoreMenu" [style.top.px]="lineMenuPosition.top" [style.left.px]="lineMenuPosition.left">
-      <button type="button" aria-label="Kopi" (click)="copySelectedLine()"><ion-icon name="copy-outline"></ion-icon><span>Kopi</span></button>
-      <button type="button" aria-label="Doubli" (click)="duplicateSelectedLine()"><ion-icon name="documents-outline"></ion-icon><span>Doublan</span></button>
+      <button type="button" aria-label="Copier" (click)="copySelectedLine()"><ion-icon name="copy-outline"></ion-icon><span>Copier</span></button>
+      <button type="button" aria-label="Dupliquer" (click)="duplicateSelectedLine()"><ion-icon name="documents-outline"></ion-icon><span>Dupliquer</span></button>
       <button class="destructive-line-action" type="button" aria-label="Supprimer" (click)="openLineDeleteActions()"><ion-icon name="trash-outline"></ion-icon><span>Supprimer</span></button>
-      <button *ngIf="canManageSelectedLine" class="more-line-button" type="button" aria-label="Plis opsyon" (click)="toggleLineMoreMenu()"><ion-icon name="ellipsis-horizontal"></ion-icon><span>Plis</span></button>
+      <button *ngIf="canManageSelectedLine" class="more-line-button" type="button" aria-label="Plus d’options" (click)="toggleLineMoreMenu()"><ion-icon name="ellipsis-horizontal"></ion-icon><span>Plus</span></button>
     </div>
     <div class="line-menu line-more-menu" *ngIf="selectedLine && showLineMoreMenu" [style.top.px]="lineMenuPosition.top" [style.left.px]="lineMenuPosition.left">
-      <button type="button" aria-label="Graf" [class.active]="selectedLine.bold" (click)="toggleSelectedLineStyle('bold')"><strong>B</strong><span>Graf</span></button>
-      <button type="button" aria-label="Italik" [class.active]="selectedLine.italic" (click)="toggleSelectedLineStyle('italic')"><i>I</i><span>Italik</span></button>
-      <button type="button" aria-label="Souliye" [class.active]="selectedLine.underline" (click)="toggleSelectedLineStyle('underline')"><u>U</u><span>Souliye</span></button>
+      <button type="button" aria-label="Gras" [class.active]="selectedLine.bold" (click)="toggleSelectedLineStyle('bold')"><strong>B</strong><span>Gras</span></button>
+      <button type="button" aria-label="Italique" [class.active]="selectedLine.italic" (click)="toggleSelectedLineStyle('italic')"><i>I</i><span>Italique</span></button>
+      <button type="button" aria-label="Souligner" [class.active]="selectedLine.underline" (click)="toggleSelectedLineStyle('underline')"><u>U</u><span>Souligner</span></button>
       <button type="button" aria-label="Ajouter une étiquette" (click)="openLabelEditor()"><ion-icon name="pricetag-outline"></ion-icon><span>Étiquette</span></button>
-      <button type="button" aria-label="Aliyen agòch" [class.active]="selectedLine.align === 'left'" (click)="setSelectedLineAlign('left')"><ion-icon name="reorder-three-outline"></ion-icon><span>Agòch</span></button>
-      <button type="button" aria-label="Santre" [class.active]="selectedLine.align === 'center'" (click)="setSelectedLineAlign('center')"><ion-icon name="reorder-four-outline"></ion-icon><span>Santre</span></button>
-      <button type="button" aria-label="Aliyen adwat" [class.active]="selectedLine.align === 'right'" (click)="setSelectedLineAlign('right')"><ion-icon name="reorder-four-outline"></ion-icon><span>Adwat</span></button>
+      <button type="button" aria-label="Aligner à gauche" [class.active]="selectedLine.align === 'left'" (click)="setSelectedLineAlign('left')"><ion-icon name="reorder-three-outline"></ion-icon><span>Gauche</span></button>
+      <button type="button" aria-label="Centrer" [class.active]="selectedLine.align === 'center'" (click)="setSelectedLineAlign('center')"><ion-icon name="reorder-four-outline"></ion-icon><span>Centre</span></button>
+      <button type="button" aria-label="Aligner à droite" [class.active]="selectedLine.align === 'right'" (click)="setSelectedLineAlign('right')"><ion-icon name="reorder-four-outline"></ion-icon><span>Droite</span></button>
     </div>
   </main>
 
@@ -280,12 +291,12 @@
   >
     <section class="pages-modal-layout" (click)="$event.stopPropagation()">
       <div class="pages-modal-header">
-        <strong id="pages-manager-title">Tout paj yo</strong>
-        <button type="button" class="close-btn" aria-label="Fèmen" (click)="closePageManager()">×</button>
+        <strong id="pages-manager-title">Toutes les pages</strong>
+        <button type="button" class="close-btn" aria-label="Fermer" (click)="closePageManager()">×</button>
       </div>
       <label class="page-search">
         <ion-icon name="search-outline"></ion-icon>
-        <input type="search" placeholder="Chèche yon nimero oswa yon tit" [(ngModel)]="pageSearchQuery" aria-label="Chèche paj">
+        <input type="search" placeholder="Rechercher un numéro ou un titre" [(ngModel)]="pageSearchQuery" aria-label="Rechercher une page">
       </label>
 
       <div class="pages-grid">
@@ -305,22 +316,22 @@
             <span class="thumbnail-lines" *ngIf="page.lines?.length; else emptyPagePreview">
               <span class="thumbnail-line" *ngFor="let previewLine of page.lines | slice:0:5">{{ previewLine.text | slice:0:34 }}</span>
             </span>
-            <ng-template #emptyPagePreview><span class="thumbnail-empty">Paj vid</span></ng-template>
+            <ng-template #emptyPagePreview><span class="thumbnail-empty">Page vide</span></ng-template>
           </span>
           <span class="thumbnail-name">{{ page.name }}</span>
           <small>{{ formatPageDate(page.createdAt) }}</small>
         </button>
 
-        <p class="pages-empty" *ngIf="!filteredPages.length">Pa jwenn okenn paj.</p>
+        <p class="pages-empty" *ngIf="!filteredPages.length">Aucune page trouvée.</p>
 
         <button class="new-page-card" type="button" (click)="addPage()">
           <span class="new-page-plus">+</span>
-          <small>Nouvo paj</small>
+          <small>Nouvelle page</small>
         </button>
       </div>
 
       <div class="pages-modal-footer">
-        <button type="button" (click)="closePageManager()">Fèmen</button>
+        <button type="button" (click)="closePageManager()">Fermer</button>
       </div>
     </section>
   </div>
@@ -423,15 +434,15 @@
 
   <div class="collab-overlay" *ngIf="showCollabSheet" (click)="closeCollabSheet()">
     <div class="modal-sheet" (click)="$event.stopPropagation()">
-      <div class="sheet-header"><strong>Pataje ak kolaborasyon</strong><button class="close-btn" type="button" (click)="closeCollabSheet()">×</button></div>
-      <button class="pending-invitations-button" *ngIf="pendingInvitationCount" type="button" (click)="openInvitations()">{{ pendingInvitationCount }} envitasyon{{ pendingInvitationCount > 1 ? ' yo' : '' }} ann atann</button>
-      <p class="empty-collab" *ngIf="!collaborators.length">Pa gen kolaboratè pou moman sa a.</p>
-      <div class="member-list" *ngIf="collaborators.length"><div class="member-row" *ngFor="let member of collaborators"><div class="avatar" [style.background]="member.color">{{ member.initials }}</div><span>{{ member.name }}</span><button class="permission-pill" type="button" (click)="onTogglePermission(member)">{{ member.canWrite ? 'Ka modifye' : 'Lektit sèlman' }}</button></div></div>
-      <button class="contact-picker-button" type="button" (click)="chooseContact()">Chwazi kontak</button>
+      <div class="sheet-header"><strong>Partage et collaboration</strong><button class="close-btn" type="button" (click)="closeCollabSheet()">×</button></div>
+      <button class="pending-invitations-button" *ngIf="pendingInvitationCount" type="button" (click)="openInvitations()">{{ pendingInvitationCount }} invitation{{ pendingInvitationCount > 1 ? 's' : '' }} en attente</button>
+      <p class="empty-collab" *ngIf="!collaborators.length">Aucun collaborateur pour le moment.</p>
+      <div class="member-list" *ngIf="collaborators.length"><div class="member-row" *ngFor="let member of collaborators"><div class="avatar" [style.background]="member.color">{{ member.initials }}</div><span>{{ member.name }}</span><button class="permission-pill" type="button" (click)="onTogglePermission(member)">{{ member.canWrite ? 'Peut modifier' : 'Lecture seule' }}</button></div></div>
+      <button class="contact-picker-button" type="button" (click)="chooseContact()">Choisir un contact</button>
       <div class="invite-form"><span>{{ countryCode }}</span><ion-input [value]="phoneValue" placeholder="1234 5678" (ionInput)="onPhoneInput($any($event).detail.value || '')"></ion-input></div>
-      <ion-input class="contact-name-input" [value]="contactName" placeholder="Non kontak la" (ionInput)="contactName = $any($event).detail.value || ''"></ion-input>
+      <ion-input class="contact-name-input" [value]="contactName" placeholder="Nom du contact" (ionInput)="contactName = $any($event).detail.value || ''"></ion-input>
       <p class="invite-error" *ngIf="phoneError">{{ phoneError }}</p>
-      <button class="primary-button" type="button" [disabled]="!isInviteValid" (click)="invitePerson()">Envite</button>
+      <button class="primary-button" type="button" [disabled]="!isInviteValid" (click)="invitePerson()">Inviter</button>
     </div>
   </div>
 </ion-app>

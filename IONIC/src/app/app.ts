@@ -170,6 +170,7 @@ interface NotebookPage {
   pageId: string;
   pageNumber: number;
   name: string;
+  continuationOfPageId?: string;
   createdAt: string;
   lines: NotebookLine[];
   ownerUserId: string;
@@ -306,16 +307,16 @@ export class App implements AfterViewInit, OnDestroy {
   labelEditorSelectedId = this.labelPresets[0].id;
 
   deleteAlertButtons = [
-    { text: 'Anile', role: 'cancel' },
-    { text: 'Efase', role: 'destructive', handler: () => this.deleteSelectedPage() },
+    { text: 'Annuler', role: 'cancel' },
+    { text: 'Supprimer', role: 'destructive', handler: () => this.deleteSelectedPage() },
   ];
 
   renameAlertButtons = [
-    { text: 'Anile', role: 'cancel' },
-    { text: 'Anrejistre', handler: (data: { name: string }) => this.renameSelectedPage(data.name) },
+    { text: 'Annuler', role: 'cancel' },
+    { text: 'Enregistrer', handler: (data: { name: string }) => this.renameSelectedPage(data.name) },
   ];
 
-  renameAlertInputs = [{ name: 'name', value: '', placeholder: 'Non paj la' }];
+  renameAlertInputs = [{ name: 'name', value: '', placeholder: 'Nom de la page' }];
 
   attachmentActionButtons = [
     { text: 'Capture rapide', icon: 'add-circle-outline', handler: () => this.startQuickCapture() },
@@ -333,7 +334,7 @@ export class App implements AfterViewInit, OnDestroy {
     { text: 'Tableau', icon: 'grid-outline', handler: () => this.createDefaultTable() },
     { text: 'Séparateur', icon: 'grid-outline', handler: () => this.openSeparatorEditor() },
     { text: 'Calculer', icon: 'calculator-outline', handler: () => this.openFormulaEditor() },
-    { text: 'Lien', icon: 'link-outline', handler: () => this.addAttachmentLine('[Lyen] ') },
+    { text: 'Lien', icon: 'link-outline', handler: () => this.addAttachmentLine('[Lien] ') },
     { text: 'Date / rappel', icon: 'calendar-outline', handler: () => this.openDynamicDateEditor() },
     { text: 'Étiquette', icon: 'pricetag-outline', handler: () => this.addAttachmentLine('# ') },
     { text: 'Annuler', role: 'cancel' },
@@ -432,7 +433,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   dateBlockCountdown(block: PageBlock): string {
     const target = this.dateBlockTarget(block);
-    if (!target) return 'Dat la pa valab';
+    if (!target) return 'Date invalide';
     const remainingSeconds = Math.max(0, Math.floor((target.getTime() - this.clockTick) / 1000));
     const days = Math.floor(remainingSeconds / 86400);
     const hours = Math.floor((remainingSeconds % 86400) / 3600);
@@ -444,7 +445,7 @@ export class App implements AfterViewInit, OnDestroy {
 
   dateBlockLabel(block: PageBlock): string {
     const target = this.dateBlockTarget(block);
-    return target ? this.formatDynamicDateTime(target) : 'Dat / lè';
+    return target ? this.formatDynamicDateTime(target) : 'Date / heure';
   }
 
   tableColumns(block: PageBlock): TableColumn[] {
@@ -528,9 +529,9 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   createDynamicPoll() {
-    const question = window.prompt('Kesyon sondaj la:')?.trim();
+    const question = window.prompt('Question du sondage :')?.trim();
     if (!question) return;
-    const options = window.prompt('Opsyon yo, separe yo ak vigil:')?.trim();
+    const options = window.prompt('Options, séparées par des virgules :')?.trim();
     if (!options) return;
     const formattedOptions = options.split(',').map((option) => option.trim()).filter(Boolean).join(' | ');
     if (!formattedOptions) return;
@@ -549,18 +550,18 @@ export class App implements AfterViewInit, OnDestroy {
   openDynamicPageMode() {
     this.showAttachmentActions = false;
     this.addPage('draft');
-    this.showSuccess('Paj dinamik ouvri.');
+    this.showSuccess('Page dynamique ouverte.');
   }
 
   quickNoteWithLabel() {
     this.showAttachmentActions = false;
     this.addAttachmentLine('# ');
-    this.showSuccess('Nòt ak etikèt pare.');
+    this.showSuccess('Note avec étiquette prête.');
   }
 
   openCommentsPanel() {
     this.showAttachmentActions = false;
-    this.showSuccess('Kòmantè yo disponib pou paj sa a.');
+    this.showSuccess('Les commentaires sont disponibles pour cette page.');
   }
 
   exportOrShare() {
@@ -578,11 +579,11 @@ export class App implements AfterViewInit, OnDestroy {
 
     if (navigator.clipboard) {
       void navigator.clipboard.writeText(`${shareData.title} - ${shareData.url}`).catch(() => undefined);
-      this.showSuccess('Lyen an te kopye pou pataje.');
+      this.showSuccess('Le lien a été copié pour être partagé.');
       return;
     }
 
-    this.showSuccess('Eksport PDF / pataje ap vini nan vèsyon pwochen.');
+    this.showSuccess('Export PDF / partage disponible dans une prochaine version.');
   }
 
   toggleDrawingMode() {
@@ -620,7 +621,7 @@ export class App implements AfterViewInit, OnDestroy {
     this.dynamicTextEditingMode = true;
     this.showDynamicTextEditor = false;
     this.showDateTimeEditor = false;
-    this.showSuccess('Mòd tèks aktif. Klike sou paj la pou ekri.');
+    this.showSuccess('Mode écriture actif. Cliquez sur la page pour écrire.');
   }
 
   openDynamicDateEditor() {
@@ -638,7 +639,7 @@ export class App implements AfterViewInit, OnDestroy {
 
     const selectedDate = new Date(value);
     if (Number.isNaN(selectedDate.getTime())) {
-      this.showSuccess('Dat / lè a pa valab. Chwazi yon dat valab.');
+      this.showSuccess('La date / heure est invalide. Choisissez une date valide.');
       return;
     }
 
@@ -647,7 +648,7 @@ export class App implements AfterViewInit, OnDestroy {
       content: this.formatDynamicDateTime(selectedDate),
       targetAt: selectedDate.toISOString(),
     });
-    this.showSuccess('Rapèl dinamik la ap konte kounye a.');
+    this.showSuccess('Le rappel dynamique est maintenant actif.');
   }
 
   private formatDynamicDateTime(date: Date): string {
@@ -831,6 +832,14 @@ export class App implements AfterViewInit, OnDestroy {
     return (this.currentPage?.blocks || []).filter((block) => block.type === 'FORMULA');
   }
 
+  formulaBlocksForColumn(column: number, columnCount: number): PageBlock[] {
+    return this.currentFormulaBlocks.filter((_, index) => index % columnCount === column);
+  }
+
+  linesForColumn(column: number, columnCount: number): NotebookLine[] {
+    return this.lines.filter((_, index) => index % columnCount === column);
+  }
+
   formulaExpression(block: PageBlock): string {
     return String(block.data['expression'] || block.data['content'] || '').replace(/^\[Formule\]\s*/, '');
   }
@@ -838,7 +847,7 @@ export class App implements AfterViewInit, OnDestroy {
   formulaResult(block: PageBlock): string {
     const expression = this.formulaExpression(block);
     const result = this.calculateFormula(expression);
-    return result === undefined ? 'Ajoute yon ekspresyon nimerik' : String(result);
+    return result === undefined ? 'Ajoutez une expression numérique' : String(result);
   }
 
   formulaResults(block: PageBlock): string[] {
@@ -1111,7 +1120,21 @@ export class App implements AfterViewInit, OnDestroy {
   get filteredPages(): NotebookPage[] {
     const query = this.pageSearchQuery.trim().toLowerCase();
     if (!query) return this.pages;
-    return this.pages.filter((page) => page.name.toLowerCase().includes(query) || String(page.pageNumber).includes(query));
+    const matchingPages = this.pages.filter((page) => page.name.toLowerCase().includes(query) || String(page.pageNumber).includes(query));
+    const familyIds = new Set(matchingPages.map((page) => this.pageFamilyId(page.pageId)));
+    return this.pages.filter((page) => familyIds.has(this.pageFamilyId(page.pageId)));
+  }
+
+  private pageFamilyId(pageId: string): string {
+    const visited = new Set<string>();
+    let page = this.pages.find((item) => item.pageId === pageId);
+    while (page?.continuationOfPageId && !visited.has(page.pageId)) {
+      visited.add(page.pageId);
+      const parent = this.pages.find((item) => item.pageId === page?.continuationOfPageId);
+      if (!parent) break;
+      page = parent;
+    }
+    return page?.pageId || pageId;
   }
   get isCurrentUserPageOwner(): boolean {
     return !!this.currentPage && (!this.currentPage.ownerUserId || this.currentPage.ownerUserId === this.currentUserId);
@@ -1126,24 +1149,24 @@ export class App implements AfterViewInit, OnDestroy {
   get pageActionButtons() {
     return [
       {
-        text: 'Renome',
+        text: 'Renommer',
         icon: 'create-outline',
         disabled: !this.canManageSelectedPage,
         handler: () => this.beginRenameSelectedPage(),
       },
       {
-        text: 'Doubli',
+        text: 'Dupliquer',
         icon: 'documents-outline',
         handler: () => this.duplicateSelectedPage(),
       },
       {
-        text: 'Efase',
+        text: 'Supprimer',
         icon: 'trash-outline',
         role: 'destructive',
         disabled: !this.canManageSelectedPage || this.pages.length <= 1,
         handler: () => this.beginDeleteSelectedPage(),
       },
-      { text: 'Anile', role: 'cancel' },
+      { text: 'Annuler', role: 'cancel' },
     ];
   }
   get selectedLabelText(): string {
@@ -1152,23 +1175,23 @@ export class App implements AfterViewInit, OnDestroy {
 
   get lineDeleteActionButtons() {
     const buttons: Array<Record<string, unknown>> = [
-      { text: 'Efase pou mwen', handler: () => this.deleteSelectedLine('local') },
+      { text: 'Masquer pour moi', handler: () => this.deleteSelectedLine('local') },
     ];
     if (this.canManageSelectedLine) {
-      buttons.push({ text: 'Efase pou tout moun', role: 'destructive', handler: () => this.deleteSelectedLine('everyone') });
+        buttons.push({ text: 'Supprimer pour tout le monde', role: 'destructive', handler: () => this.deleteSelectedLine('everyone') });
     }
     if (this.isCurrentUserPageOwner) {
-      buttons.push({ text: 'Efase tout mesaj paj la', role: 'destructive', handler: () => this.deleteAllPageMessages() });
+        buttons.push({ text: 'Supprimer tous les messages de la page', role: 'destructive', handler: () => this.deleteAllPageMessages() });
     }
-    buttons.push({ text: 'Anile', role: 'cancel' });
+      buttons.push({ text: 'Annuler', role: 'cancel' });
     return buttons;
   }
   get labelManageActionButtons() {
     return [
-      { text: 'Modifye etikèt la', icon: 'create-outline', handler: () => this.beginEditSelectedLabel(false) },
-      { text: 'Chanje koulè', icon: 'pricetag-outline', handler: () => this.beginEditSelectedLabel(true) },
-      { text: 'Efase etikèt la', icon: 'trash-outline', role: 'destructive', handler: () => this.removeSelectedLabel() },
-      { text: 'Anile', role: 'cancel' },
+      { text: 'Modifier l’étiquette', icon: 'create-outline', handler: () => this.beginEditSelectedLabel(false) },
+      { text: 'Changer la couleur', icon: 'pricetag-outline', handler: () => this.beginEditSelectedLabel(true) },
+      { text: 'Supprimer l’étiquette', icon: 'trash-outline', role: 'destructive', handler: () => this.removeSelectedLabel() },
+      { text: 'Annuler', role: 'cancel' },
     ];
   }
   get canGoPrevious(): boolean { return this.pageNumber > 1; }
@@ -1492,10 +1515,14 @@ export class App implements AfterViewInit, OnDestroy {
   addPage(paperType: NotebookPage['paperType'] = 'lined') {
     this.saveCurrentPage();
     const pageNumber = this.pages.length + 1;
+    const previousPage = this.pages[this.pages.length - 1];
+    const requestedTitle = window.prompt('Titre de la nouvelle page (laissez vide pour continuer la page précédente) :', '')?.trim() || '';
+    const isContinuation = !requestedTitle && !!previousPage;
     const page: NotebookPage = {
       pageId: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       pageNumber,
-      name: `Page ${pageNumber}`,
+      name: requestedTitle || (previousPage ? `Suite de ${previousPage.name}` : `Page ${pageNumber}`),
+      continuationOfPageId: isContinuation ? previousPage?.pageId : undefined,
       createdAt: this.toLocalCreatedAt(),
       lines: [],
       ownerUserId: this.currentUserId,

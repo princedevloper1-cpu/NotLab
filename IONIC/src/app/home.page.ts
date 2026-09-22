@@ -36,18 +36,18 @@ export class HomePage {
   isAccountBusy = false;
   accountMessage = '';
   showNewNoteAlert = false;
-  newNoteMessage = 'Bay yon non pou nòt ou a.';
+  newNoteMessage = 'Donnez un nom à votre note.';
   private pendingNoteTitle = '';
-  newNoteInputs = [{ name: 'title', type: 'text' as const, placeholder: 'Non nòt la', value: '', attributes: { 'aria-label': 'Non nòt la', maxlength: 100 } }];
+  newNoteInputs = [{ name: 'title', type: 'text' as const, placeholder: 'Nom de la note', value: '', attributes: { 'aria-label': 'Nom de la note', maxlength: 100 } }];
   newNoteButtons = [
-    { text: 'Anile', role: 'cancel' },
+    { text: 'Annuler', role: 'cancel' },
     {
-      text: 'Kreye',
+      text: 'Créer',
       role: 'confirm',
       handler: (data: { title?: string }) => {
         const title = (data.title || '').trim();
         if (!title) {
-          this.newNoteMessage = 'Tanpri, ekri non nòt la.';
+          this.newNoteMessage = 'Veuillez saisir le nom de la note.';
           return false;
         }
         this.pendingNoteTitle = title.slice(0, 100);
@@ -87,7 +87,7 @@ export class HomePage {
 
   deleteAccount() {
     if (this.isAccountBusy) return;
-    const confirmed = window.confirm('Efase kont ou ak done NotLab definitivman ?');
+    const confirmed = window.confirm('Supprimer définitivement votre compte et vos données NotLab ?');
     if (!confirmed) return;
     const userId = localStorage.getItem('notlab.userId') || '';
     if (!userId) {
@@ -164,7 +164,7 @@ export class HomePage {
 
   createNewNotebook() {
     this.pendingNoteTitle = '';
-    this.newNoteMessage = 'Bay yon non pou nòt ou a.';
+    this.newNoteMessage = 'Donnez un nom à votre note.';
     this.newNoteInputs = this.newNoteInputs.map((input) => ({ ...input, value: '' }));
     this.showNewNoteAlert = true;
   }

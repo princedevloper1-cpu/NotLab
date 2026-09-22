@@ -2,32 +2,32 @@
   <header class="home-header">
     <div class="brand"><span class="brand-icon">▤</span><strong>Notlab</strong></div>
     <div class="header-actions">
-      <button type="button" aria-label="Chèche" (click)="toggleSearch()">⌕</button>
+      <button type="button" aria-label="Rechercher" (click)="toggleSearch()">⌕</button>
       <div class="account-menu-wrap">
         <button type="button" aria-label="Opsyon kont la" [attr.aria-expanded]="showAccountMenu" (click)="toggleAccountMenu()">⋮</button>
         <div class="account-menu" *ngIf="showAccountMenu">
           <strong>{{ userName }}</strong>
-          <button type="button" [disabled]="isAccountBusy" (click)="logout()">Dekonekte</button>
-          <button class="delete-account" type="button" [disabled]="isAccountBusy" (click)="deleteAccount()">Efase kont mwen</button>
+          <button type="button" [disabled]="isAccountBusy" (click)="logout()">Se déconnecter</button>
+          <button class="delete-account" type="button" [disabled]="isAccountBusy" (click)="deleteAccount()">Supprimer mon compte</button>
           <small *ngIf="accountMessage">{{ accountMessage }}</small>
         </div>
       </div>
     </div>
   </header>
 
-  <div class="search-bar" *ngIf="isSearchActive"><input type="search" placeholder="Chèche yon nòt" [(ngModel)]="searchQuery"></div>
+  <div class="search-bar" *ngIf="isSearchActive"><input type="search" placeholder="Rechercher une note" [(ngModel)]="searchQuery"></div>
 
-  <nav class="home-tabs" aria-label="Seksyon">
-    <button [class.active]="selectedTabIndex === 0" type="button" (click)="selectTab(0)">Nòt mwen</button>
-    <button [class.active]="selectedTabIndex === 1" type="button" (click)="selectTab(1)">Pataje</button>
-    <button [class.active]="selectedTabIndex === 2" type="button" (click)="selectTab(2)">Favori</button>
+  <nav class="home-tabs" aria-label="Sections">
+    <button [class.active]="selectedTabIndex === 0" type="button" (click)="selectTab(0)">Mes notes</button>
+    <button [class.active]="selectedTabIndex === 1" type="button" (click)="selectTab(1)">Partagées</button>
+    <button [class.active]="selectedTabIndex === 2" type="button" (click)="selectTab(2)">Favoris</button>
   </nav>
 
   <section class="home-content">
     <div class="notebook-list">
       <div class="empty-state" *ngIf="!filteredNotebooks.length">
-        <p>Poko gen nòt.</p>
-        <button type="button" (click)="createNewNotebook()">Kreye premye nòt</button>
+        <p>Aucune note pour le moment.</p>
+        <button type="button" (click)="createNewNotebook()">Créer ma première note</button>
       </div>
       <a class="notebook-card" *ngFor="let notebook of filteredNotebooks" routerLink="/notebook" (click)="selectNotebook(notebook, $event)">
         <div class="notebook-thumb"><span></span></div>
@@ -35,12 +35,12 @@
           <h3>{{ notebook.title }}</h3>
           <p>{{ notebook.people }} · {{ notebook.pages }} {{ notebook.pages === 1 ? 'page' : 'pages' }}</p>
         </div>
-        <div class="notebook-meta"><time>{{ notebook.date }}</time><button type="button" aria-label="Opsyon nòt la" (click)="toggleOptions(notebook.id, $event)">⋮</button><div class="notebook-options" *ngIf="openOptionsId === notebook.id"><button type="button" (click)="toggleFavorite(notebook.id, $event)"><span class="menu-icon">{{ notebook.isFavorite ? '★' : '☆' }}</span>{{ notebook.isFavorite ? 'Retire nan favori' : 'Ajoute nan favori' }}</button><button class="delete-option" type="button" (click)="deleteNotebook(notebook.id, $event)">Efase</button></div></div>
+        <div class="notebook-meta"><time>{{ notebook.date }}</time><button type="button" aria-label="Options de la note" (click)="toggleOptions(notebook.id, $event)">⋮</button><div class="notebook-options" *ngIf="openOptionsId === notebook.id"><button type="button" (click)="toggleFavorite(notebook.id, $event)"><span class="menu-icon">{{ notebook.isFavorite ? '★' : '☆' }}</span>{{ notebook.isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris' }}</button><button class="delete-option" type="button" (click)="deleteNotebook(notebook.id, $event)">Supprimer</button></div></div>
       </a>
     </div>
   </section>
 
-  <button class="new-note" type="button" aria-label="Nouvelle nòt" title="Nouvelle nòt" (click)="createNewNotebook()">
+  <button class="new-note" type="button" aria-label="Nouvelle note" title="Nouvelle note" (click)="createNewNotebook()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
       <path d="M12 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7" />
       <path d="m16 3 5 5M10 14l4-1L22 5a2.12 2.12 0 0 0-3-3l-8 8-1 4Z" />
@@ -48,7 +48,7 @@
   </button>
   <ion-alert
     [isOpen]="showNewNoteAlert"
-    header="Nouvelle nòt"
+    header="Nouvelle note"
     [message]="newNoteMessage"
     [inputs]="newNoteInputs"
     [buttons]="newNoteButtons"

@@ -35,6 +35,7 @@ import {
   reorderFourOutline,
   reorderThreeOutline,
   searchOutline,
+  timeOutline,
   sendOutline,
   settingsOutline,
   trashOutline,
@@ -69,6 +70,7 @@ addIcons({
   reorderFourOutline,
   reorderThreeOutline,
   searchOutline,
+  timeOutline,
   sendOutline,
   settingsOutline,
   trashOutline,
@@ -153,6 +155,10 @@ export class App implements AfterViewInit {
   selectedLine?: NotebookLine;
   showTypography = false;
   showEmojiPicker = false;
+  emojiCategory: 'smiley' | 'marker' | 'recent' = 'smiley';
+  readonly smileyStickers = ['😀', '😂', '😍', '😎', '🥳', '😢', '😡', '🤔', '👍', '👏', '🙏', '💡', '❤️', '🔥', '🚀', '✅', '✨', '🎉'];
+  readonly markerStyles = ['⭐', '🌟', '✨', '💫', '🔖', '📌', '📍', '✅', '☑️', '❗', '❓', '⚠️', '💡', '❤️', '🔥', '🎯', '🏷️', '🔵', '🟢', '🔴'];
+  recentStickers = this.loadRecentStickers();
   showCollabSheet = false;
   pendingInvitationCount = 0;
   collaboratorCount = 1;
@@ -161,7 +167,9 @@ export class App implements AfterViewInit {
   showProjectOptions = false;
   showDrawingTools = false;
   isDrawingMode = false;
+  showDynamicMode = false;
   drawingTool: 'pencil' | 'eraser' = 'pencil';
+  drawingColor = localStorage.getItem('notlab.editor.drawingColor') || '#4b16c7';
   drawingSize = 4;
   showLineMenu = false;
   showLineMoreMenu = false;
@@ -216,7 +224,10 @@ export class App implements AfterViewInit {
   private isDrawing = false;
   private drawingHistory: string[] = [];
   private drawingRedoHistory: string[] = [];
+  private activeTouchPointers = new Set<number>();
+  private lastTwoFingerTap = 0;
   private readonly authorPalette = ['#2563eb', '#059669', '#7c3aed', '#db2777', '#d97706', '#0891b2', '#4f46e5', '#be123c'];
+  readonly globalColorPalette = ['#173b7a', '#4b16c7', '#2563eb', '#059669', '#d97706', '#db2777', '#dc2626', '#111827'];
   readonly labelPresets: LabelStyle[] = [
     { id: 'yellow', name: 'Important', backgroundColor: '#FDE68A', textColor: '#1F2937', opacity: 0.9 },
     { id: 'blue', name: 'Design', backgroundColor: '#BFDBFE', textColor: '#0F172A', opacity: 0.9 },
@@ -283,6 +294,59 @@ export class App implements AfterViewInit {
     this.closeLineMenus();
     this.showAuthorPopover = false;
     this.showDrawingTools = false;
+    this.showDynamicMode = false;
+  }
+
+  handleEditorPointerDown(event: PointerEvent) {
+    if (event.pointerType !== 'touch') return;
+    this.activeTouchPointers.add(event.pointerId);
+    if (this.activeTouchPointers.size !== 2) return;
+    const now = Date.now();
+    if (now - this.lastTwoFingerTap < 450) {
+      this.openDynamicModeOnDraftPage();
+      this.lastTwoFingerTap = 0;
+    } else {
+      this.lastTwoFingerTap = now;
+    }
+  }
+
+  handleEditorPointerUp(event: PointerEvent) {
+    this.activeTouchPointers.delete(event.pointerId);
+  }
+
+  private openDynamicModeOnDraftPage() {
+    const draftPage = this.pages.find((page) => page.paperType === 'draft');
+    if (draftPage && draftPage.pageNumber !== this.pageNumber) {
+      this.openPage(draftPage.pageNumber);
+    } else if (!draftPage) {
+      this.addPage('draft');
+    }
+    this.isDrawingMode = false;
+    this.showDrawingTools = false;
+    this.showEmojiPicker = false;
+    this.showTypography = false;
+    setTimeout(() => this.showDynamicMode = true, 0);
+  }
+
+  addDynamicChecklist() {
+    this.addAttachmentLine('[ ] ');
+    this.showDynamicMode = false;
+  }
+
+  addDynamicLabel() {
+    this.addAttachmentLine('# ');
+    this.showDynamicMode = false;
+  }
+
+  createDynamicPoll() {
+    const question = window.prompt('Kesyon sondaj la:')?.trim();
+    if (!question) return;
+    const options = window.prompt('Opsyon yo, separe yo ak vigil:')?.trim();
+    if (!options) return;
+    const formattedOptions = options.split(',').map((option) => option.trim()).filter(Boolean).join(' | ');
+    if (!formattedOptions) return;
+    this.addAttachmentLine(`[Sondaj] ${question} :: ${formattedOptions}`);
+    this.showDynamicMode = false;
   }
 
   toggleDrawingMode() {
@@ -318,6 +382,13 @@ export class App implements AfterViewInit {
     this.drawingSize = Math.max(1, Math.min(24, size));
   }
 
+  setDrawingColor(color: string) {
+    this.drawingColor = color;
+    localStorage.setItem('notlab.editor.drawingColor', color);
+    this.drawingTool = 'pencil';
+    this.isDrawingMode = true;
+  }
+
   private resizeDrawingCanvas() {
     const canvas = this.drawingCanvas?.nativeElement;
     if (!canvas) return;
@@ -326,13 +397,16 @@ export class App implements AfterViewInit {
     canvas.width = Math.max(1, Math.round(rect.width * ratio));
     canvas.height = Math.max(1, Math.round(rect.height * ratio));
     const context = canvas.getContext('2d');
-    context?.scale(ratio, ratio);
-    this.drawingHistory = [];
-    this.saveDrawingSnapshot();
+    if (!context) return;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, rect.width, rect.height);
   }
 
   @HostListener('window:resize')
-  onWindowResize() { this.resizeDrawingCanvas(); }
+  onWindowResize() {
+    this.resizeDrawingCanvas();
+    this.loadDrawing();
+  }
 
   startDrawing(event: PointerEvent) {
     if (!this.isDrawingMode) return;
@@ -345,7 +419,7 @@ export class App implements AfterViewInit {
     context.lineCap = 'round';
     context.lineJoin = 'round';
     context.lineWidth = this.drawingSize;
-    context.strokeStyle = this.drawingTool === 'eraser' ? '#ffffff' : '#4b16c7';
+    context.strokeStyle = this.drawingTool === 'eraser' ? '#ffffff' : this.drawingColor;
     this.isDrawing = true;
     canvas.setPointerCapture(event.pointerId);
   }
@@ -355,9 +429,14 @@ export class App implements AfterViewInit {
     const canvas = this.drawingCanvas?.nativeElement;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
-    const point = this.drawingPoint(event, canvas);
-    context.lineTo(point.x, point.y);
-    context.stroke();
+    const events = event.getCoalescedEvents ? event.getCoalescedEvents() : [event];
+    events.forEach((coalescedEvent) => {
+      const point = this.drawingPoint(coalescedEvent, canvas);
+      context.lineTo(point.x, point.y);
+      context.stroke();
+      context.beginPath();
+      context.moveTo(point.x, point.y);
+    });
   }
 
   stopDrawing() {
@@ -403,16 +482,23 @@ export class App implements AfterViewInit {
     image.onload = () => {
       context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
       context.drawImage(image, 0, 0, canvas.clientWidth, canvas.clientHeight);
-      localStorage.setItem(this.drawingStorageKey(), snapshot);
     };
     image.src = snapshot;
   }
 
   private loadDrawing() {
+    const canvas = this.drawingCanvas?.nativeElement;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     const snapshot = localStorage.getItem(this.drawingStorageKey());
-    if (!snapshot) return;
-    this.restoreDrawing(snapshot);
-    this.drawingHistory = [snapshot];
+    if (snapshot) {
+      this.restoreDrawing(snapshot);
+      this.drawingHistory = [snapshot];
+    } else {
+      this.drawingHistory = [canvas.toDataURL()];
+    }
+    this.drawingRedoHistory = [];
   }
 
   private drawingStorageKey() { return `notlab.editor.drawing.${this.currentPage?.pageId || this.pageNumber}`; }
@@ -759,6 +845,10 @@ export class App implements AfterViewInit {
     this.pageNumber = page.pageNumber;
     this.lines = page.lines;
     this.closeLineMenus();
+    setTimeout(() => {
+      this.resizeDrawingCanvas();
+      this.loadDrawing();
+    }, 0);
   }
   addPage(paperType: NotebookPage['paperType'] = 'lined') {
     this.saveCurrentPage();
@@ -1176,8 +1266,23 @@ export class App implements AfterViewInit {
 
   chooseEmoji(emoji: string) {
     this.draftText += emoji;
+    this.recentStickers = [emoji, ...this.recentStickers.filter((item) => item !== emoji)].slice(0, 12);
+    localStorage.setItem('notlab.editor.recentStickers', JSON.stringify(this.recentStickers));
     this.showEmojiPicker = false;
     setTimeout(() => void this.composerInput?.setFocus(), 0);
+  }
+
+  selectEmojiCategory(category: 'smiley' | 'marker' | 'recent') {
+    this.emojiCategory = category;
+  }
+
+  private loadRecentStickers(): string[] {
+    try {
+      const saved = JSON.parse(localStorage.getItem('notlab.editor.recentStickers') || '[]');
+      return Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string').slice(0, 12) : [];
+    } catch {
+      return [];
+    }
   }
 
   onPhoneInput(value: string) {

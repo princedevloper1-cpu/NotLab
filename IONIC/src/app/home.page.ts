@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { IonAlert } from '@ionic/angular';
 import { RouterLink } from '@angular/router';
 import { Router } from '@angular/router';
 import { NotlabBackendService, SharedProject } from './notlab-backend.service';
@@ -21,7 +22,7 @@ interface NotebookItem {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, IonAlert],
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss',
 })
@@ -34,6 +35,26 @@ export class HomePage {
   showAccountMenu = false;
   isAccountBusy = false;
   accountMessage = '';
+  showNewNoteAlert = false;
+  newNoteMessage = 'Bay yon non pou nòt ou a.';
+  private pendingNoteTitle = '';
+  newNoteInputs = [{ name: 'title', type: 'text' as const, placeholder: 'Non nòt la', value: '', attributes: { 'aria-label': 'Non nòt la', maxlength: 100 } }];
+  newNoteButtons = [
+    { text: 'Anile', role: 'cancel' },
+    {
+      text: 'Kreye',
+      role: 'confirm',
+      handler: (data: { title?: string }) => {
+        const title = (data.title || '').trim();
+        if (!title) {
+          this.newNoteMessage = 'Tanpri, ekri non nòt la.';
+          return false;
+        }
+        this.pendingNoteTitle = title.slice(0, 100);
+        return true;
+      },
+    },
+  ];
 
   notebooks: NotebookItem[] = this.loadNotebooks();
 
@@ -66,7 +87,7 @@ export class HomePage {
 
   deleteAccount() {
     if (this.isAccountBusy) return;
-    const confirmed = window.confirm('Supprimer définitivement votre compte et vos données NotLab ?');
+    const confirmed = window.confirm('Efase kont ou ak done NotLab definitivman ?');
     if (!confirmed) return;
     const userId = localStorage.getItem('notlab.userId') || '';
     if (!userId) {
@@ -142,11 +163,25 @@ export class HomePage {
   }
 
   createNewNotebook() {
+    this.pendingNoteTitle = '';
+    this.newNoteMessage = 'Bay yon non pou nòt ou a.';
+    this.newNoteInputs = this.newNoteInputs.map((input) => ({ ...input, value: '' }));
+    this.showNewNoteAlert = true;
+  }
+
+  dismissNewNoteAlert(event: CustomEvent<{ role?: string }>) {
+    this.showNewNoteAlert = false;
+    const title = this.pendingNoteTitle;
+    this.pendingNoteTitle = '';
+    if (event.detail.role === 'confirm' && title) this.createNamedNotebook(title);
+  }
+
+  private createNamedNotebook(title: string) {
     const now = Date.now();
     const notebook: NotebookItem = {
       id: `nb_${now}`,
       projectId: `project:${this.userName}:${now}`,
-      title: 'Nouvelle note',
+      title,
       date: 'Aujourd’hui',
       dateModified: now,
       people: '1 personne',
@@ -214,7 +249,26 @@ export class HomePage {
       }
     }
 
-    return [];
+    return this.createStarterNotebookList();
+  }
+
+  private createStarterNotebookList(): NotebookItem[] {
+    const starterNotebook: NotebookItem = {
+      id: 'nb_starter',
+      projectId: `project:${this.userName}:starter`,
+      title: 'Première note',
+      date: 'Aujourd’hui',
+      dateModified: Date.now(),
+      people: '1 personne',
+      memberCount: 1,
+      pages: 1,
+      isShared: false,
+      isFavorite: false,
+    };
+
+    const starterList = [starterNotebook];
+    localStorage.setItem('notlab.notebooks', JSON.stringify(starterList));
+    return starterList;
   }
 
   private saveNotebooks() {

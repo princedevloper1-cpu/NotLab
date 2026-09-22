@@ -123,6 +123,39 @@ p {
   gap: 10px;
 }
 
+.empty-state {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  margin: 36px 0 18px;
+  padding: 24px 18px;
+  border: 1px dashed rgba(148, 163, 184, .28);
+  border-radius: 18px;
+  background: rgba(23, 29, 41, .75);
+  text-align: center;
+}
+
+.empty-state p {
+  margin: 0;
+  color: rgba(226, 232, 240, .7);
+  font-size: 14px;
+}
+
+.empty-state button {
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #286df0;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.empty-state button:hover {
+  background: #367cff;
+}
+
 .empty-notebooks {
   margin: 32px 0;
   color: rgba(226, 232, 240, .55);
@@ -244,24 +277,37 @@ p {
   position: fixed;
   right: 22px;
   bottom: max(22px, env(safe-area-inset-bottom));
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  padding: 0 25px;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 0;
   border: 0;
-  border-radius: 30px;
+  border-radius: 18px;
   background: #286df0;
   color: white;
   box-shadow: 0 8px 22px rgba(0, 0, 0, .3);
-  font-size: 17px;
-  font-weight: 800;
   cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
 }
 
-.new-note span {
-  font-size: 28px;
-  font-weight: 400;
+.new-note svg {
+  width: 26px;
+  height: 26px;
+}
+
+.new-note:hover {
+  background: #367cff;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .35);
+}
+
+.new-note:active {
+  background: #1f5bd0;
+}
+
+.new-note:focus-visible {
+  outline: 3px solid #a9ccff;
+  outline-offset: 4px;
 }
 
 @media (max-width: 600px) {

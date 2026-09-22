@@ -1,33 +1,33 @@
 <main class="auth-shell">
   <section class="auth-card" [class.form-card]="mode !== 'welcome'" [class.success-card]="mode === 'success'">
-    <button *ngIf="mode !== 'welcome' && mode !== 'success'" class="back-button" type="button" aria-label="Retour" (click)="goBack()">‹</button>
+    <button *ngIf="mode !== 'welcome' && mode !== 'success'" class="back-button" type="button" aria-label="Retounen" (click)="goBack()">‹</button>
 
     <ng-container *ngIf="mode === 'welcome'">
       <div class="welcome-art" aria-hidden="true">
-        <div class="paper-preview"><span>De meilleures<br>idées<br>commencent<br>ici.</span><i></i></div>
+        <div class="paper-preview"><span>Pi bon<br>ide<br>kòmanse<br>isit.</span><i></i></div>
         <div class="pen-preview"></div>
       </div>
       <div class="brand-mark">N</div>
       <p class="eyebrow">NOTLAB</p>
-      <h1>Écrire. Partager.<br>Aller plus loin.</h1>
-      <p class="description">Ton espace pour transformer chaque idée en quelque chose de concret.</p>
+      <h1>Ekri. Pataje.<br>Al pi lwen.</h1>
+      <p class="description">Espas ou pou transfòme chak lide an yon bagay reyèl.</p>
       <div class="welcome-actions">
-        <button class="primary-action" type="button" (click)="showRegister()">Créer un compte</button>
-        <button class="secondary-action" type="button" (click)="showLogin()">Se connecter</button>
+        <button class="primary-action" type="button" (click)="showRegister()">Kreye yon kont</button>
+        <button class="secondary-action" type="button" (click)="showLogin()">Konekte</button>
       </div>
       <div class="pager" aria-label="Étape 1 sur 3"><span class="active"></span><span></span><span></span></div>
     </ng-container>
 
     <ng-container *ngIf="mode === 'register' || mode === 'login'">
       <div class="compact-brand"><span class="brand-mark">N</span><span>NOTLAB</span></div>
-      <h1>{{ mode === 'register' ? 'Créer un compte' : 'Se connecter' }}</h1>
-      <p class="description">{{ mode === 'register' ? 'Rejoignez Notlab et commencez à écrire vos idées partout.' : 'Retrouvez vos idées et continuez là où vous vous êtes arrêté.' }}</p>
+      <h1>{{ mode === 'register' ? 'Kreye yon kont' : 'Konekte' }}</h1>
+      <p class="description">{{ mode === 'register' ? 'Antre nan Notlab epi kòmanse ekri lide ou ovarye.' : 'Retounen nan lide ou epi kontinye kote ou te kanpe.' }}</p>
 
       <form class="registration-form" (submit)="$event.preventDefault(); mode === 'register' ? submitRegistration() : login()">
-        <label for="name">Nom d'utilisateur</label>
+        <label for="name">Non itilizatè</label>
         <ion-input id="name" type="text" fill="outline" placeholder="John" [value]="name" (ionInput)="name = $any($event).detail.value || ''"></ion-input>
 
-        <label for="phone">Numéro de téléphone</label>
+        <label for="phone">Nimewo telefòn</label>
         <div class="phone-field">
           <select class="country-select" aria-label="Pays et indicatif" [value]="selectedCountryIso" (change)="selectCountry($any($event.target).value)">
             <option *ngFor="let country of countries" [value]="country.iso">{{ country.flag }} {{ country.name }} ({{ country.dialCode }})</option>
@@ -37,25 +37,25 @@
             <ion-input id="phone" type="tel" inputmode="numeric" [placeholder]="selectedCountry.placeholder" [value]="phone" (ionInput)="phone = $any($event).detail.value || ''"></ion-input>
           </div>
         </div>
-        <small class="field-hint">{{ selectedCountry.localLength }} chiffres · le code {{ selectedCountry.dialCode }} est ajouté automatiquement.</small>
+        <small class="field-hint">{{ selectedCountry.localLength }} chif · kòd {{ selectedCountry.dialCode }} ajoute otomatikman.</small>
 
         <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
         <button class="primary-action form-action" type="submit" [disabled]="isSubmitting">
           <ion-spinner *ngIf="isSubmitting" name="crescent"></ion-spinner>
-          <span *ngIf="!isSubmitting">{{ mode === 'register' ? 'Créer mon compte' : 'Se connecter' }}</span>
+          <span *ngIf="!isSubmitting">{{ mode === 'register' ? 'Kreye kont mwen' : 'Konekte' }}</span>
         </button>
       </form>
 
-      <p class="helper">{{ mode === 'register' ? 'En créant un compte, vous acceptez nos Conditions d’utilisation et notre Politique de confidentialité.' : 'Pas encore de compte ?' }} <button type="button" (click)="mode === 'register' ? showLogin() : showRegister()">{{ mode === 'register' ? 'Se connecter' : 'Créer un compte' }}</button></p>
+      <p class="helper">{{ mode === 'register' ? 'Lè w kreye yon kont, ou aksepte Kondisyon itilizasyon nou yo ak Politik konfidansyalite nou an.' : 'Poko gen kont ?' }} <button type="button" (click)="mode === 'register' ? showLogin() : showRegister()">{{ mode === 'register' ? 'Konekte' : 'Kreye yon kont' }}</button></p>
     </ng-container>
 
     <ng-container *ngIf="mode === 'success'">
       <div class="success-mark"><span class="brand-mark">N</span><b>✓</b></div>
       <p class="eyebrow">NOTLAB</p>
-      <h1>Bienvenue sur Notlab !</h1>
-      <p class="description">Votre compte est prêt.<br>Commencez à écrire vos idées dès maintenant.</p>
-      <button class="primary-action form-action" type="button" (click)="continueToHome()">Commencer</button>
-      <p class="success-note">De grandes idées vous attendent !</p>
+      <h1>Byenveni sou Notlab !</h1>
+      <p class="description">Kont ou pare.<br>Kòmanse ekri lide ou imedyatman.</p>
+      <button class="primary-action form-action" type="button" (click)="continueToHome()">Kòmanse</button>
+      <p class="success-note">Gwo lide ap tann ou !</p>
     </ng-container>
   </section>
 </main>

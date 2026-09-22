@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AfterViewInit, Component, ElementRef, HostListener, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, ViewChild } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { IonActionSheet, IonAlert, IonApp, IonContent, IonIcon, IonInput, IonPopover, IonToast } from '@ionic/angular';
@@ -12,11 +12,16 @@ import {
   arrowBackOutline,
   arrowUndoOutline,
   attachOutline,
+  backspaceOutline,
+  barChartOutline,
   bookOutline,
   cameraOutline,
+  calculatorOutline,
+  calendarOutline,
   checkboxOutline,
   chevronBackOutline,
   chevronForwardOutline,
+  closeOutline,
   cloudUploadOutline,
   copyOutline,
   createOutline,
@@ -27,6 +32,8 @@ import {
   happyOutline,
   imageOutline,
   informationCircleOutline,
+  gridOutline,
+  linkOutline,
   micOutline,
   pencilOutline,
   peopleOutline,
@@ -47,11 +54,16 @@ addIcons({
   arrowBackOutline,
   arrowUndoOutline,
   attachOutline,
+  backspaceOutline,
+  barChartOutline,
   bookOutline,
   cameraOutline,
+  calculatorOutline,
+  calendarOutline,
   checkboxOutline,
   chevronBackOutline,
   chevronForwardOutline,
+  closeOutline,
   cloudUploadOutline,
   copyOutline,
   createOutline,
@@ -62,6 +74,8 @@ addIcons({
   happyOutline,
   imageOutline,
   informationCircleOutline,
+  gridOutline,
+  linkOutline,
   micOutline,
   pencilOutline,
   peopleOutline,
@@ -122,6 +136,36 @@ interface AuthorView {
   isCurrentUser: boolean;
   isOnline?: boolean;
 }
+
+type PageBlockType = 'TEXT' | 'CHECKLIST' | 'POLL' | 'TABLE' | 'FORMULA' | 'IMAGE' | 'FILE' | 'LINK' | 'VOICE' | 'DRAWING' | 'DATE' | 'SHAPE';
+
+interface PageBlock {
+  id: string;
+  pageId: string;
+  authorId: string;
+  type: PageBlockType;
+  position: number;
+  data: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TableColumn {
+  id: string;
+  name: string;
+}
+
+interface TableRow {
+  id: string;
+  cells: Record<string, string>;
+}
+
+interface CalculatorHistoryItem {
+  expression: string;
+  result: number;
+  createdAt: string;
+}
+
 interface NotebookPage {
   pageId: string;
   pageNumber: number;
@@ -130,6 +174,7 @@ interface NotebookPage {
   lines: NotebookLine[];
   ownerUserId: string;
   paperType?: 'lined' | 'draft';
+  blocks?: PageBlock[];
 }
 
 @Component({
@@ -139,7 +184,7 @@ interface NotebookPage {
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App implements AfterViewInit {
+export class App implements AfterViewInit, OnDestroy {
   @ViewChild('composerInput') composerInput?: IonInput;
   @ViewChild('drawingCanvas') drawingCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('attachmentPicker') attachmentPicker?: ElementRef<HTMLInputElement>;
@@ -167,8 +212,26 @@ export class App implements AfterViewInit {
   showProjectOptions = false;
   showDrawingTools = false;
   isDrawingMode = false;
-  showDynamicMode = false;
-  drawingTool: 'pencil' | 'eraser' = 'pencil';
+  isDynamicMode = false;
+  showDynamicTextEditor = false;
+  showDateTimeEditor = false;
+  dynamicTextEditingMode = false;
+  showFormulaEditor = false;
+  formulaDraft = '';
+  calculatorResult?: number;
+  calculatorError = '';
+  calculatorMode: 'standard' | 'scientific' | 'history' = 'standard';
+  calculatorAngleMode: 'DEG' | 'RAD' = 'DEG';
+  showScientificKeys = false;
+  calculatorHistory: CalculatorHistoryItem[] = this.loadCalculatorHistory();
+  private calculatorClearTimer?: number;
+  formulaResultDraft: Record<string, string> = {};
+  formulaValidation: Record<string, 'correct' | 'incorrect'> = {};
+  dynamicTextPosition = { top: 72, left: 18 };
+  dateTimeDraft = '';
+  clockTick = Date.now();
+  private dateTimer?: number;
+  drawingTool: 'pencil' | 'highlighter' | 'eraser' = 'pencil';
   drawingColor = localStorage.getItem('notlab.editor.drawingColor') || '#4b16c7';
   drawingSize = 4;
   showLineMenu = false;
@@ -212,8 +275,10 @@ export class App implements AfterViewInit {
     align: 'left' as 'left' | 'center' | 'right',
   };
 
-  pages: NotebookPage[] = this.loadPages();
-  lines: NotebookLine[] = this.pages[0]?.lines || [];
+  private loadedProjectId = localStorage.getItem('notlab.activeProjectId') || `project:${this.currentUserId}`;
+  private readonly legacyProjectId = localStorage.getItem('notlab.activeProjectId');
+  pages: NotebookPage[] = [];
+  lines: NotebookLine[] = [];
   collaborators: Collaborator[] = [];
   pageNumbers: number[] = [];
   private pagePressTimer?: number;
@@ -241,31 +306,43 @@ export class App implements AfterViewInit {
   labelEditorSelectedId = this.labelPresets[0].id;
 
   deleteAlertButtons = [
-    { text: 'Annuler', role: 'cancel' },
-    { text: 'Supprimer', role: 'destructive', handler: () => this.deleteSelectedPage() },
+    { text: 'Anile', role: 'cancel' },
+    { text: 'Efase', role: 'destructive', handler: () => this.deleteSelectedPage() },
   ];
 
   renameAlertButtons = [
-    { text: 'Annuler', role: 'cancel' },
-    { text: 'Enregistrer', handler: (data: { name: string }) => this.renameSelectedPage(data.name) },
+    { text: 'Anile', role: 'cancel' },
+    { text: 'Anrejistre', handler: (data: { name: string }) => this.renameSelectedPage(data.name) },
   ];
 
-  renameAlertInputs = [{ name: 'name', value: '', placeholder: 'Nom de la page' }];
+  renameAlertInputs = [{ name: 'name', value: '', placeholder: 'Non paj la' }];
 
   attachmentActionButtons = [
+    { text: 'Capture rapide', icon: 'add-circle-outline', handler: () => this.startQuickCapture() },
+    { text: 'Page dynamique', icon: 'documents-outline', handler: () => this.openDynamicPageMode() },
+    { text: 'Collaboration', icon: 'people-outline', handler: () => this.openCollabSheet() },
+    { text: 'Note avec étiquette', icon: 'pricetag-outline', handler: () => this.quickNoteWithLabel() },
+    { text: 'Commentaires', icon: 'send-outline', handler: () => this.openCommentsPanel() },
+    { text: 'Exporter PDF / partager', icon: 'cloud-upload-outline', handler: () => this.exportOrShare() },
+    { text: 'Sondage', icon: 'bar-chart-outline', handler: () => this.createDynamicPoll() },
     { text: 'Image', icon: 'image-outline', handler: () => this.openAttachmentPicker('image') },
     { text: 'Photo', icon: 'camera-outline', handler: () => this.openAttachmentPicker('photo') },
     { text: 'Fichier', icon: 'document-attach-outline', handler: () => this.openAttachmentPicker('file') },
     { text: 'Note vocale', icon: 'mic-outline', handler: () => this.toggleVoiceRecording() },
-    { text: 'Checklist', icon: 'checkbox-outline', handler: () => this.addAttachmentLine('[ ] ') },
-    { text: 'Label', icon: 'pricetag-outline', handler: () => this.addAttachmentLine('# ') },
+    { text: 'Liste', icon: 'checkbox-outline', handler: () => this.addAttachmentLine('[ ] ') },
+    { text: 'Tableau', icon: 'grid-outline', handler: () => this.createDefaultTable() },
+    { text: 'Séparateur', icon: 'grid-outline', handler: () => this.openSeparatorEditor() },
+    { text: 'Calculer', icon: 'calculator-outline', handler: () => this.openFormulaEditor() },
+    { text: 'Lien', icon: 'link-outline', handler: () => this.addAttachmentLine('[Lyen] ') },
+    { text: 'Date / rappel', icon: 'calendar-outline', handler: () => this.openDynamicDateEditor() },
+    { text: 'Étiquette', icon: 'pricetag-outline', handler: () => this.addAttachmentLine('# ') },
     { text: 'Annuler', role: 'cancel' },
   ];
 
   get currentUserId(): string { return localStorage.getItem('notlab.userId') || 'web-user'; }
   get currentUserName(): string { return localStorage.getItem('notlab.currentUserName') || 'Utilisateur'; }
   get currentUserAvatarUrl(): string { return localStorage.getItem('notlab.currentUserAvatar') || ''; }
-  get currentProjectId(): string { return localStorage.getItem('notlab.activeProjectId') || `project:${this.currentUserId}`; }
+  get currentProjectId(): string { return this.loadedProjectId; }
   get currentProjectTitle(): string { return localStorage.getItem('notlab.activeProjectTitle') || 'Projet Notlab'; }
   get collaborationIconName(): string { return this.collaboratorCount > 1 ? 'people-outline' : 'person-outline'; }
   get canUndoDrawing(): boolean { return this.drawingHistory.length > 1; }
@@ -274,11 +351,17 @@ export class App implements AfterViewInit {
   ngAfterViewInit() {
     this.resizeDrawingCanvas();
     setTimeout(() => this.loadDrawing(), 0);
+    this.dateTimer = window.setInterval(() => this.clockTick = Date.now(), 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.dateTimer) window.clearInterval(this.dateTimer);
   }
 
   @HostListener('document:click', ['$event'])
   closePanelsOnOutsideClick(event: Event) {
     const target = event.target as HTMLElement | null;
+    if (this.isDynamicMode && target?.closest('.notebook-paper')) return;
     if (!target || target.closest(
       '.typography-popover, .emoji-picker, .line-menu, .composer-wrap, .editor-header, '
       + '.pages-modal-layout, .label-editor-panel, .modal-sheet, ion-popover, ion-action-sheet, ion-alert, ion-modal'
@@ -294,7 +377,9 @@ export class App implements AfterViewInit {
     this.closeLineMenus();
     this.showAuthorPopover = false;
     this.showDrawingTools = false;
-    this.showDynamicMode = false;
+    this.showDynamicTextEditor = false;
+    this.showDateTimeEditor = false;
+    this.dynamicTextEditingMode = false;
   }
 
   handleEditorPointerDown(event: PointerEvent) {
@@ -303,7 +388,7 @@ export class App implements AfterViewInit {
     if (this.activeTouchPointers.size !== 2) return;
     const now = Date.now();
     if (now - this.lastTwoFingerTap < 450) {
-      this.openDynamicModeOnDraftPage();
+      this.toggleEditorMode();
       this.lastTwoFingerTap = 0;
     } else {
       this.lastTwoFingerTap = now;
@@ -314,28 +399,132 @@ export class App implements AfterViewInit {
     this.activeTouchPointers.delete(event.pointerId);
   }
 
-  private openDynamicModeOnDraftPage() {
-    const draftPage = this.pages.find((page) => page.paperType === 'draft');
-    if (draftPage && draftPage.pageNumber !== this.pageNumber) {
-      this.openPage(draftPage.pageNumber);
-    } else if (!draftPage) {
-      this.addPage('draft');
-    }
+  toggleEditorMode() {
+    this.stopDrawing();
+    this.closeFloatingPanels();
+    this.showAttachmentActions = false;
     this.isDrawingMode = false;
-    this.showDrawingTools = false;
-    this.showEmojiPicker = false;
-    this.showTypography = false;
-    setTimeout(() => this.showDynamicMode = true, 0);
+    this.isDynamicMode = !this.isDynamicMode;
+    this.dynamicTextEditingMode = this.isDynamicMode;
   }
 
   addDynamicChecklist() {
     this.addAttachmentLine('[ ] ');
-    this.showDynamicMode = false;
   }
 
   addDynamicLabel() {
     this.addAttachmentLine('# ');
-    this.showDynamicMode = false;
+  }
+
+  get currentTableBlocks(): PageBlock[] {
+    return (this.currentPage?.blocks || []).filter((block) => block.type === 'TABLE');
+  }
+
+  get currentDateBlocks(): PageBlock[] {
+    return (this.currentPage?.blocks || []).filter((block) => block.type === 'DATE');
+  }
+
+  dateBlockTarget(block: PageBlock): Date | undefined {
+    const targetAt = String(block.data['targetAt'] || '');
+    const target = new Date(targetAt);
+    return targetAt && !Number.isNaN(target.getTime()) ? target : undefined;
+  }
+
+  dateBlockCountdown(block: PageBlock): string {
+    const target = this.dateBlockTarget(block);
+    if (!target) return 'Dat la pa valab';
+    const remainingSeconds = Math.max(0, Math.floor((target.getTime() - this.clockTick) / 1000));
+    const days = Math.floor(remainingSeconds / 86400);
+    const hours = Math.floor((remainingSeconds % 86400) / 3600);
+    const minutes = Math.floor((remainingSeconds % 3600) / 60);
+    const seconds = remainingSeconds % 60;
+    const time = [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
+    return days ? `${days} jou ${time}` : time;
+  }
+
+  dateBlockLabel(block: PageBlock): string {
+    const target = this.dateBlockTarget(block);
+    return target ? this.formatDynamicDateTime(target) : 'Dat / lè';
+  }
+
+  tableColumns(block: PageBlock): TableColumn[] {
+    return (block.data['columns'] as TableColumn[] | undefined) || [];
+  }
+
+  tableRows(block: PageBlock): TableRow[] {
+    return (block.data['rows'] as TableRow[] | undefined) || [];
+  }
+
+  createDefaultTable() {
+    this.showAttachmentActions = false;
+    const columns: TableColumn[] = Array.from({ length: 3 }, (_, index) => ({ id: `col-${Date.now()}-${index}`, name: String(index + 1) }));
+    const rows: TableRow[] = Array.from({ length: 3 }, (_, rowIndex) => ({
+      id: `row-${Date.now()}-${rowIndex}`,
+      cells: Object.fromEntries(columns.map((column) => [column.id, ''])),
+    }));
+    this.addPageBlock('TABLE', { title: 'Nouveau tableau', columns, rows });
+  }
+
+  openSeparatorEditor() {
+    this.showAttachmentActions = false;
+    const value = window.prompt('Combien de colonnes voulez-vous sur cette page ? (2 à 6)', String(this.currentSeparatorCount || 2));
+    if (value === null) return;
+    const count = Number.parseInt(value, 10);
+    if (!Number.isInteger(count) || count < 2 || count > 6) {
+      this.showSuccess('Choisissez un nombre de colonnes entre 2 et 6.', 'danger');
+      return;
+    }
+
+    const existing = this.currentSeparatorBlock;
+    if (existing) {
+      existing.data['columns'] = count;
+      existing.updatedAt = new Date().toISOString();
+      this.persistPages();
+      this.showSuccess('Séparateur mis à jour.');
+      return;
+    }
+
+    this.addPageBlock('SHAPE', { shape: 'separator', columns: count });
+    this.showSuccess(`${count} colonnes prêtes pour vos exercices.`);
+  }
+
+  get currentSeparatorBlock(): PageBlock | undefined {
+    return (this.currentPage?.blocks || []).find((block) => block.type === 'SHAPE' && block.data['shape'] === 'separator');
+  }
+
+  get currentSeparatorCount(): number {
+    const count = Number(this.currentSeparatorBlock?.data['columns']);
+    return Number.isInteger(count) && count >= 2 ? count : 0;
+  }
+
+  separatorIndexes(block: PageBlock): number[] {
+    const count = Number(block.data['columns']);
+    return Number.isInteger(count) && count >= 2 ? Array.from({ length: count - 1 }, (_, index) => index + 1) : [];
+  }
+
+  separatorPosition(block: PageBlock, index: number): number {
+    const count = Number(block.data['columns']);
+    return count >= 2 ? (index * 100) / count : 0;
+  }
+
+  addTableRow(block: PageBlock) {
+    const columns = this.tableColumns(block);
+    const rows = this.tableRows(block);
+    rows.push({ id: `row-${Date.now()}-${rows.length}`, cells: Object.fromEntries(columns.map((column) => [column.id, ''])) });
+    this.persistPages();
+  }
+
+  addTableColumn(block: PageBlock) {
+    const columns = this.tableColumns(block);
+    const id = `col-${Date.now()}-${columns.length}`;
+    columns.push({ id, name: String(columns.length + 1) });
+    this.tableRows(block).forEach((row) => row.cells[id] = '');
+    this.persistPages();
+  }
+
+  updateTableCell(block: PageBlock) {
+    block.updatedAt = new Date().toISOString();
+    this.persistPages();
   }
 
   createDynamicPoll() {
@@ -346,7 +535,54 @@ export class App implements AfterViewInit {
     const formattedOptions = options.split(',').map((option) => option.trim()).filter(Boolean).join(' | ');
     if (!formattedOptions) return;
     this.addAttachmentLine(`[Sondaj] ${question} :: ${formattedOptions}`);
-    this.showDynamicMode = false;
+  }
+
+  startQuickCapture() {
+    this.showAttachmentActions = false;
+    this.draftText = '';
+    this.dynamicTextEditingMode = true;
+    this.showDynamicTextEditor = true;
+    this.dynamicTextPosition = { top: 72, left: 18 };
+    this.showSuccess('Capture rapid aktiv.');
+  }
+
+  openDynamicPageMode() {
+    this.showAttachmentActions = false;
+    this.addPage('draft');
+    this.showSuccess('Paj dinamik ouvri.');
+  }
+
+  quickNoteWithLabel() {
+    this.showAttachmentActions = false;
+    this.addAttachmentLine('# ');
+    this.showSuccess('Nòt ak etikèt pare.');
+  }
+
+  openCommentsPanel() {
+    this.showAttachmentActions = false;
+    this.showSuccess('Kòmantè yo disponib pou paj sa a.');
+  }
+
+  exportOrShare() {
+    this.showAttachmentActions = false;
+    const shareData = {
+      title: this.currentProjectTitle,
+      text: `NotLab - ${this.currentProjectTitle}`,
+      url: window.location.href,
+    };
+
+    if (navigator.share) {
+      void navigator.share(shareData).catch(() => undefined);
+      return;
+    }
+
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(`${shareData.title} - ${shareData.url}`).catch(() => undefined);
+      this.showSuccess('Lyen an te kopye pou pataje.');
+      return;
+    }
+
+    this.showSuccess('Eksport PDF / pataje ap vini nan vèsyon pwochen.');
   }
 
   toggleDrawingMode() {
@@ -373,9 +609,375 @@ export class App implements AfterViewInit {
     this.drawingPressTimer = undefined;
   }
 
-  selectDrawingTool(tool: 'pencil' | 'eraser') {
+  selectDrawingTool(tool: 'pencil' | 'highlighter' | 'eraser') {
     this.drawingTool = tool;
     this.isDrawingMode = true;
+  }
+
+  startDynamicText() {
+    this.showAttachmentActions = false;
+    this.draftText = '';
+    this.dynamicTextEditingMode = true;
+    this.showDynamicTextEditor = false;
+    this.showDateTimeEditor = false;
+    this.showSuccess('Mòd tèks aktif. Klike sou paj la pou ekri.');
+  }
+
+  openDynamicDateEditor() {
+    this.showAttachmentActions = false;
+    this.showDynamicTextEditor = false;
+    this.showFormulaEditor = false;
+    this.dateTimeDraft = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 19);
+    this.showDateTimeEditor = true;
+    this.dynamicTextEditingMode = true;
+  }
+
+  saveDynamicDateReminder() {
+    const value = this.dateTimeDraft.trim();
+    if (!value) return;
+
+    const selectedDate = new Date(value);
+    if (Number.isNaN(selectedDate.getTime())) {
+      this.showSuccess('Dat / lè a pa valab. Chwazi yon dat valab.');
+      return;
+    }
+
+    this.showDateTimeEditor = false;
+    this.addPageBlock('DATE', {
+      content: this.formatDynamicDateTime(selectedDate),
+      targetAt: selectedDate.toISOString(),
+    });
+    this.showSuccess('Rapèl dinamik la ap konte kounye a.');
+  }
+
+  private formatDynamicDateTime(date: Date): string {
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
+  }
+
+  deleteDynamicSelection() {
+    if (this.selectedLine) {
+      this.deleteSelectedLine('local');
+      return;
+    }
+    this.showDynamicTextEditor = false;
+    this.showFormulaEditor = false;
+  }
+
+  openFormulaEditor() {
+    this.showAttachmentActions = false;
+    this.formulaDraft = '';
+    this.calculatorResult = undefined;
+    this.calculatorError = '';
+    this.calculatorMode = 'standard';
+    this.showFormulaEditor = true;
+  }
+
+  addFormulaToken(token: string) {
+    const normalized = token === '×' ? '*' : token === '÷' ? '/' : token === '−' ? '-' : token;
+    const last = this.formulaDraft.slice(-1);
+    if (/^[+*/-]$/.test(normalized) && (!this.formulaDraft || /^[+*/-]$/.test(last))) return;
+    if (normalized === '.' && (last === '.' || /\d+\.\d*$/.test(this.formulaDraft))) return;
+    this.formulaDraft += normalized;
+    this.calculatorResult = undefined;
+    this.calculatorError = '';
+  }
+
+  clearCalculator() {
+    this.formulaDraft = '';
+    this.calculatorResult = undefined;
+    this.calculatorError = '';
+  }
+
+  deleteCalculatorCharacter() {
+    this.formulaDraft = this.formulaDraft.slice(0, -1);
+    this.calculatorResult = undefined;
+    this.calculatorError = '';
+  }
+
+  toggleCalculatorSign() {
+    if (!this.formulaDraft) return;
+    this.formulaDraft = this.formulaDraft.startsWith('-') ? this.formulaDraft.slice(1) : `-(${this.formulaDraft})`;
+    this.calculatorResult = undefined;
+    this.calculatorError = '';
+  }
+
+  startCalculatorClear() {
+    this.cancelCalculatorClear();
+    this.calculatorClearTimer = window.setTimeout(() => this.clearCalculator(), 550);
+  }
+
+  cancelCalculatorClear() {
+    if (this.calculatorClearTimer) window.clearTimeout(this.calculatorClearTimer);
+    this.calculatorClearTimer = undefined;
+  }
+
+  setCalculatorMode(mode: 'standard' | 'scientific' | 'history') {
+    this.calculatorMode = mode;
+  }
+
+  toggleScientificKeys() {
+    this.showScientificKeys = !this.showScientificKeys;
+  }
+
+  addScientificFunction(functionName: string) {
+    if (functionName === 'π' || functionName === 'e') {
+      this.addFormulaToken(functionName === 'π' ? 'pi' : 'e');
+      return;
+    }
+    if (functionName === 'x²') {
+      this.addFormulaToken('^2');
+      return;
+    }
+    if (functionName === 'xʸ') {
+      this.addFormulaToken('^');
+      return;
+    }
+    if (functionName === '1/x') {
+      this.formulaDraft = this.formulaDraft ? `1/(${this.formulaDraft})` : '1/(';
+      return;
+    }
+    if (functionName === '|x|') functionName = 'abs';
+    if (functionName === '√') functionName = 'sqrt';
+    if (functionName === 'x!') functionName = 'factorial';
+    this.formulaDraft += `${functionName}(`;
+    this.calculatorResult = undefined;
+    this.calculatorError = '';
+  }
+
+  toggleCalculatorAngleMode() {
+    this.calculatorAngleMode = this.calculatorAngleMode === 'DEG' ? 'RAD' : 'DEG';
+  }
+
+  calculateDraft() {
+    const expression = this.formulaDraft.trim();
+    const result = this.calculateFormula(expression);
+    if (result === undefined) {
+      this.calculatorResult = undefined;
+      this.calculatorError = 'Expression invalide ou opération impossible';
+      return;
+    }
+    this.calculatorResult = result;
+    this.calculatorError = '';
+    if (expression) this.addCalculatorHistory(expression, result);
+  }
+
+  saveFormula() {
+    const formula = this.formulaDraft.trim();
+    if (!formula || this.calculatorResult === undefined) return;
+    this.showFormulaEditor = false;
+    this.addAttachmentLine(`[Formule] ${formula}`, { expectedResult: this.calculatorResult });
+    this.calculatorResult = undefined;
+  }
+
+  formattedCalculatorResult(): string {
+    return this.calculatorResult === undefined ? '' : this.formatCalculatorNumber(this.calculatorResult);
+  }
+
+  formatCalculatorNumber(value: number): string {
+    return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 10 }).format(value);
+  }
+
+  private addCalculatorHistory(expression: string, result: number) {
+    this.calculatorHistory = [
+      { expression, result, createdAt: new Date().toISOString() },
+      ...this.calculatorHistory.filter((item) => item.expression !== expression),
+    ].slice(0, 30);
+    localStorage.setItem('notlab.calculator.history', JSON.stringify(this.calculatorHistory));
+  }
+
+  private loadCalculatorHistory(): CalculatorHistoryItem[] {
+    try {
+      const saved = JSON.parse(localStorage.getItem('notlab.calculator.history') || '[]');
+      return Array.isArray(saved) ? saved.filter((item): item is CalculatorHistoryItem => typeof item?.expression === 'string' && Number.isFinite(item?.result)).slice(0, 30) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  reuseCalculatorHistory(item: CalculatorHistoryItem) {
+    this.calculatorMode = 'standard';
+    this.formulaDraft = item.expression;
+    this.calculatorResult = item.result;
+    this.calculatorError = '';
+  }
+
+  copyCalculatorResult(item: CalculatorHistoryItem) {
+    void navigator.clipboard?.writeText(String(item.result));
+  }
+
+  insertCalculatorHistory(item: CalculatorHistoryItem) {
+    this.showFormulaEditor = false;
+    this.addAttachmentLine(`[Formule] ${item.expression}`, { expectedResult: item.result });
+  }
+
+  deleteCalculatorHistory(item: CalculatorHistoryItem) {
+    this.calculatorHistory = this.calculatorHistory.filter((entry) => entry !== item);
+    localStorage.setItem('notlab.calculator.history', JSON.stringify(this.calculatorHistory));
+  }
+
+  clearCalculatorHistory() {
+    this.calculatorHistory = [];
+    localStorage.removeItem('notlab.calculator.history');
+  }
+
+  get currentFormulaBlocks(): PageBlock[] {
+    return (this.currentPage?.blocks || []).filter((block) => block.type === 'FORMULA');
+  }
+
+  formulaExpression(block: PageBlock): string {
+    return String(block.data['expression'] || block.data['content'] || '').replace(/^\[Formule\]\s*/, '');
+  }
+
+  formulaResult(block: PageBlock): string {
+    const expression = this.formulaExpression(block);
+    const result = this.calculateFormula(expression);
+    return result === undefined ? 'Ajoute yon ekspresyon nimerik' : String(result);
+  }
+
+  formulaResults(block: PageBlock): string[] {
+    return Array.isArray(block.data['results']) ? block.data['results'].filter((result): result is string => typeof result === 'string') : [];
+  }
+
+  addFormulaResult(block: PageBlock) {
+    const value = (this.formulaResultDraft[block.id] || '').trim();
+    if (!value) {
+      this.formulaValidation[block.id] = 'incorrect';
+      return;
+    }
+    const storedExpected = Number(block.data['expectedResult']);
+    const expected = Number.isFinite(storedExpected) ? storedExpected : this.calculateFormula(this.formulaExpression(block));
+    const answer = Number(value.replace(',', '.'));
+    if (expected === undefined || !Number.isFinite(answer)) {
+      this.formulaValidation[block.id] = 'incorrect';
+      return;
+    }
+
+    this.formulaValidation[block.id] = Math.abs(answer - expected) < 0.000001 ? 'correct' : 'incorrect';
+  }
+
+  formulaValidationMessage(block: PageBlock): string {
+    const validation = this.formulaValidation[block.id];
+    if (validation === 'correct') return 'Réponse correcte';
+    if (validation === 'incorrect') return 'Réponse incorrecte';
+    return '';
+  }
+
+  private calculateFormula(expression: string): number | undefined {
+    const normalized = expression.replace(/,/g, '.').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/\s+/g, '').replace(/π/g, 'pi');
+    let index = 0;
+    const parseExpression = (): number | undefined => {
+      let value = parseTerm();
+      while (value !== undefined && (normalized[index] === '+' || normalized[index] === '-')) {
+        const operator = normalized[index++];
+        const right = parseTerm();
+        if (right === undefined) return undefined;
+        value = operator === '+' ? value + right : value - right;
+      }
+      return value;
+    };
+    const parseTerm = (): number | undefined => {
+      let value = parsePower();
+      while (value !== undefined && (normalized[index] === '*' || normalized[index] === '/' || normalized[index] === '%')) {
+        const operator = normalized[index++];
+        const right = parsePower();
+        if (right === undefined || (operator === '/' && right === 0)) return undefined;
+        value = operator === '*' ? value * right : operator === '/' ? value / right : value % right;
+      }
+      return value;
+    };
+    const parsePower = (): number | undefined => {
+      let value = parseUnary();
+      if (value !== undefined && normalized[index] === '^') {
+        index++;
+        const exponent = parsePower();
+        if (exponent === undefined) return undefined;
+        value = Math.pow(value, exponent);
+      }
+      return value;
+    };
+    const parseUnary = (): number | undefined => {
+      if (normalized[index] === '+') { index++; return parseUnary(); }
+      if (normalized[index] === '-') { index++; const value = parseUnary(); return value === undefined ? undefined : -value; }
+      return parsePrimary();
+    };
+    const parsePrimary = (): number | undefined => {
+      if (normalized[index] === '(') {
+        index++;
+        const value = parseExpression();
+        if (normalized[index++] !== ')') return undefined;
+        return value;
+      }
+      const functionMatch = normalized.slice(index).match(/^(sin|cos|tan|log|ln|sqrt|abs|factorial)/);
+      if (functionMatch) {
+        index += functionMatch[0].length;
+        if (normalized[index++] !== '(') return undefined;
+        const argument = parseExpression();
+        if (normalized[index++] !== ')' || argument === undefined) return undefined;
+        return this.applyCalculatorFunction(functionMatch[0], argument);
+      }
+      if (normalized.slice(index, index + 2) === 'pi') { index += 2; return Math.PI; }
+      if (normalized[index] === 'e') { index++; return Math.E; }
+      const number = normalized.slice(index).match(/^\d+(?:\.\d+)?/);
+      if (!number) return undefined;
+      index += number[0].length;
+      return Number(number[0]);
+    };
+    const result = parseExpression();
+    return result !== undefined && index === normalized.length && Number.isFinite(result) && Math.abs(result) <= Number.MAX_SAFE_INTEGER ? Number(result.toFixed(10)) : undefined;
+  }
+
+  private applyCalculatorFunction(name: string, value: number): number | undefined {
+    if (name === 'sin' || name === 'cos' || name === 'tan') {
+      const angle = this.calculatorAngleMode === 'DEG' ? value * Math.PI / 180 : value;
+      return name === 'sin' ? Math.sin(angle) : name === 'cos' ? Math.cos(angle) : Math.tan(angle);
+    }
+    if (name === 'log') return value > 0 ? Math.log10(value) : undefined;
+    if (name === 'ln') return value > 0 ? Math.log(value) : undefined;
+    if (name === 'sqrt') return value >= 0 ? Math.sqrt(value) : undefined;
+    if (name === 'abs') return Math.abs(value);
+    if (name === 'factorial') return value >= 0 && Number.isInteger(value) && value <= 170 ? Array.from({ length: value }, (_, i) => i + 1).reduce((total, current) => total * current, 1) : undefined;
+    return undefined;
+  }
+
+  startDynamicTextAt(event: MouseEvent) {
+    if (!this.isDynamicMode || this.isDrawingMode) return;
+    const paper = (event.currentTarget as HTMLElement).closest('.notebook-paper')?.getBoundingClientRect();
+    if (!paper) return;
+    this.dynamicTextPosition = {
+      top: Math.max(58, event.clientY - paper.top - 20),
+      left: Math.max(12, Math.min(paper.width - 230, event.clientX - paper.left)),
+    };
+    this.showAttachmentActions = false;
+    this.showDateTimeEditor = false;
+    this.showFormulaEditor = false;
+    this.editingLineId = undefined;
+    this.selectedLine = undefined;
+    this.draftText = '';
+    this.dynamicTextEditingMode = true;
+    this.showDynamicTextEditor = true;
+  }
+
+  editDynamicLine(line: NotebookLine, event: Event) {
+    if (!this.isDynamicMode || !this.dynamicTextEditingMode) return;
+    event.stopPropagation();
+    if (!this.canManageLine(line)) return;
+    this.editingLineId = line.id;
+    this.draftText = line.text;
+    this.showDynamicTextEditor = true;
+  }
+
+  sendDynamicText() {
+    if (!this.draftText.trim()) return;
+    this.sendLine();
+    this.showDynamicTextEditor = false;
+    this.showFormulaEditor = false;
   }
 
   setDrawingSize(size: number) {
@@ -420,6 +1022,7 @@ export class App implements AfterViewInit {
     context.lineJoin = 'round';
     context.lineWidth = this.drawingSize;
     context.strokeStyle = this.drawingTool === 'eraser' ? '#ffffff' : this.drawingColor;
+    context.globalAlpha = this.drawingTool === 'highlighter' ? 0.35 : 1;
     this.isDrawing = true;
     canvas.setPointerCapture(event.pointerId);
   }
@@ -442,6 +1045,8 @@ export class App implements AfterViewInit {
   stopDrawing() {
     if (!this.isDrawing) return;
     this.isDrawing = false;
+    const context = this.drawingCanvas?.nativeElement.getContext('2d');
+    if (context) context.globalAlpha = 1;
     this.saveDrawingSnapshot();
   }
 
@@ -521,24 +1126,24 @@ export class App implements AfterViewInit {
   get pageActionButtons() {
     return [
       {
-        text: 'Renommer',
+        text: 'Renome',
         icon: 'create-outline',
         disabled: !this.canManageSelectedPage,
         handler: () => this.beginRenameSelectedPage(),
       },
       {
-        text: 'Dupliquer',
+        text: 'Doubli',
         icon: 'documents-outline',
         handler: () => this.duplicateSelectedPage(),
       },
       {
-        text: 'Supprimer',
+        text: 'Efase',
         icon: 'trash-outline',
         role: 'destructive',
         disabled: !this.canManageSelectedPage || this.pages.length <= 1,
         handler: () => this.beginDeleteSelectedPage(),
       },
-      { text: 'Annuler', role: 'cancel' },
+      { text: 'Anile', role: 'cancel' },
     ];
   }
   get selectedLabelText(): string {
@@ -547,23 +1152,23 @@ export class App implements AfterViewInit {
 
   get lineDeleteActionButtons() {
     const buttons: Array<Record<string, unknown>> = [
-      { text: 'Supprimer pour moi', handler: () => this.deleteSelectedLine('local') },
+      { text: 'Efase pou mwen', handler: () => this.deleteSelectedLine('local') },
     ];
     if (this.canManageSelectedLine) {
-      buttons.push({ text: 'Supprimer pour tout le monde', role: 'destructive', handler: () => this.deleteSelectedLine('everyone') });
+      buttons.push({ text: 'Efase pou tout moun', role: 'destructive', handler: () => this.deleteSelectedLine('everyone') });
     }
     if (this.isCurrentUserPageOwner) {
-      buttons.push({ text: 'Supprimer tous les messages de la page', role: 'destructive', handler: () => this.deleteAllPageMessages() });
+      buttons.push({ text: 'Efase tout mesaj paj la', role: 'destructive', handler: () => this.deleteAllPageMessages() });
     }
-    buttons.push({ text: 'Annuler', role: 'cancel' });
+    buttons.push({ text: 'Anile', role: 'cancel' });
     return buttons;
   }
   get labelManageActionButtons() {
     return [
-      { text: 'Modifier le label', icon: 'create-outline', handler: () => this.beginEditSelectedLabel(false) },
-      { text: 'Changer de couleur', icon: 'pricetag-outline', handler: () => this.beginEditSelectedLabel(true) },
-      { text: 'Supprimer le label', icon: 'trash-outline', role: 'destructive', handler: () => this.removeSelectedLabel() },
-      { text: 'Annuler', role: 'cancel' },
+      { text: 'Modifye etikèt la', icon: 'create-outline', handler: () => this.beginEditSelectedLabel(false) },
+      { text: 'Chanje koulè', icon: 'pricetag-outline', handler: () => this.beginEditSelectedLabel(true) },
+      { text: 'Efase etikèt la', icon: 'trash-outline', role: 'destructive', handler: () => this.removeSelectedLabel() },
+      { text: 'Anile', role: 'cancel' },
     ];
   }
   get canGoPrevious(): boolean { return this.pageNumber > 1; }
@@ -789,13 +1394,47 @@ export class App implements AfterViewInit {
     private readonly router: Router,
     private readonly backend: NotlabBackendService,
   ) {
+    this.pages = this.loadPages();
+    this.lines = this.pages[0]?.lines || [];
     this.isEditorRoute = this.router.url === '/notebook';
     this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe((event) => {
       this.isEditorRoute = (event as NavigationEnd).urlAfterRedirects === '/notebook';
+      if (this.isEditorRoute) this.activateNotebook();
+      else this.saveCurrentPage();
     });
     this.loadCollaborationState();
     if (this.pages.length) this.syncPageState();
     else this.ensurePageForWriting();
+  }
+
+  private activateNotebook() {
+    const projectId = localStorage.getItem('notlab.activeProjectId') || `project:${this.currentUserId}`;
+    if (projectId !== this.loadedProjectId) {
+      this.stopDrawing();
+      this.saveCurrentPage();
+      this.loadedProjectId = projectId;
+      this.pages = this.loadPages();
+      this.pageNumber = 1;
+      this.lines = this.pages[0]?.lines || [];
+      this.draftText = '';
+      this.selectedLine = undefined;
+      this.closeLineMenus();
+      this.closePageManager();
+      this.showProjectOptions = false;
+      this.isDynamicMode = false;
+      this.showDrawingTools = false;
+      this.isDrawingMode = false;
+      this.activeTouchPointers.clear();
+      this.collaborators = [];
+      this.collaboratorCount = 1;
+      this.loadCollaborationState();
+    }
+    this.ensurePageForWriting();
+    this.syncPageState();
+    setTimeout(() => {
+      this.resizeDrawingCanvas();
+      this.loadDrawing();
+    }, 0);
   }
 
   private syncPageState() {
@@ -861,6 +1500,7 @@ export class App implements AfterViewInit {
       lines: [],
       ownerUserId: this.currentUserId,
       paperType,
+      blocks: [],
     };
     this.pages = [...this.pages, page];
     this.syncPageState();
@@ -976,8 +1616,12 @@ export class App implements AfterViewInit {
   }
 
   returnToDefaultPage() {
-    this.showProjectOptions = false;
-    this.openPage(1);
+    this.stopDrawing();
+    this.closeFloatingPanels();
+    this.isDrawingMode = false;
+    const defaultPage = this.pages.find((page) => page.paperType !== 'draft');
+    if (defaultPage) this.openPage(defaultPage.pageNumber);
+    else this.addPage('lined');
   }
 
   deletePageFromProjectMenu() {
@@ -1429,10 +2073,30 @@ export class App implements AfterViewInit {
     this.addAttachmentLine(`[${label}: ${file.name}]`);
   }
 
-  addAttachmentLine(text: string) {
+  addAttachmentLine(text: string, extraData: Record<string, unknown> = {}) {
     this.showAttachmentActions = false;
+    const type = text.startsWith('[Sondaj]') ? 'POLL' : text.startsWith('[Tableau]') ? 'TABLE' : text.startsWith('[Formule]') ? 'FORMULA' : text.startsWith('[Lien]') ? 'LINK' : text.startsWith('[Date / Rappel]') ? 'DATE' : text.startsWith('[Note vocale') ? 'VOICE' : text.startsWith('[Image') || text.startsWith('[Photo') ? 'IMAGE' : text.startsWith('[Fichier') ? 'FILE' : text.startsWith('[ ]') ? 'CHECKLIST' : 'TEXT';
+    this.addPageBlock(type, type === 'FORMULA' ? { expression: text.replace(/^\[Formule\]\s*/, ''), results: [], ...extraData } : { content: text, ...extraData });
     this.draftText = text;
     this.sendLine();
+  }
+
+  private addPageBlock(type: PageBlockType, data: Record<string, unknown>) {
+    const page = this.currentPage;
+    if (!page) return;
+    const now = new Date().toISOString();
+    const block: PageBlock = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      pageId: page.pageId,
+      authorId: this.currentUserId,
+      type,
+      position: page.blocks?.length || 0,
+      data,
+      createdAt: now,
+      updatedAt: now,
+    };
+    page.blocks = [...(page.blocks || []), block];
+    this.persistPages();
   }
 
   async toggleVoiceRecording() {
@@ -1509,7 +2173,9 @@ export class App implements AfterViewInit {
       year: 'numeric',
     }).format(date);
   }
-  private storageKey() { return `notlab.editor.page.${this.pageNumber}`; }
+  private pagesStorageKey() {
+    return `notlab.editor.pages.${encodeURIComponent(this.currentUserId)}.${encodeURIComponent(this.currentProjectId)}`;
+  }
 
   private saveCurrentPage() {
     const page = this.pages.find((item) => item.pageNumber === this.pageNumber);
@@ -1517,25 +2183,28 @@ export class App implements AfterViewInit {
     this.persistPages();
   }
 
-  private loadTotalPages(): number {
-    const savedTotal = Number(localStorage.getItem('notlab.editor.totalPages'));
-    return Number.isInteger(savedTotal) && savedTotal > 0 ? savedTotal : 10;
-  }
-
   private loadPages(): NotebookPage[] {
     try {
-      const saved = JSON.parse(localStorage.getItem('notlab.editor.pages') || 'null') as NotebookPage[] | null;
-      if (saved?.length) {
-        if (localStorage.getItem('notlab.editor.seeded') === 'true') {
-          localStorage.removeItem('notlab.editor.pages');
-          localStorage.removeItem('notlab.editor.totalPages');
-          localStorage.removeItem('notlab.editor.seeded');
-          return [];
+      const key = this.pagesStorageKey();
+      let stored = localStorage.getItem(key);
+      // Preserve the old shared snapshot once, under the previously active notebook.
+      if (stored === null && this.currentProjectId === this.legacyProjectId
+          && !localStorage.getItem('notlab.editor.pages.migratedTo')
+          && localStorage.getItem('notlab.editor.seeded') !== 'true') {
+        const legacy = localStorage.getItem('notlab.editor.pages');
+        if (legacy && Array.isArray(JSON.parse(legacy))) {
+          localStorage.setItem(key, legacy);
+          localStorage.setItem('notlab.editor.pages.migratedTo', key);
+          stored = legacy;
         }
+      }
+      const saved = JSON.parse(stored || 'null') as NotebookPage[] | null;
+      if (Array.isArray(saved) && saved.length) {
         const migrated = saved.map((page, index) => ({
           ...page,
           pageNumber: index + 1,
           ownerUserId: page.ownerUserId || this.currentUserId,
+          blocks: Array.isArray(page.blocks) ? page.blocks : [],
           lines: (page.lines || []).map((line) => {
             const authorId = line.authorId || line.userId || page.ownerUserId || this.currentUserId;
             return {
@@ -1559,8 +2228,7 @@ export class App implements AfterViewInit {
   }
 
   private persistPages() {
-    localStorage.setItem('notlab.editor.pages', JSON.stringify(this.pages));
-    localStorage.setItem('notlab.editor.totalPages', String(this.pages.length));
+    localStorage.setItem(this.pagesStorageKey(), JSON.stringify(this.pages));
   }
 
   private syncPagesToBackend() {
